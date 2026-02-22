@@ -46,7 +46,49 @@ Three terminal methods are provided. `Execute` compiles the script (if source wa
 
 All pipeline methods return a `JyroResult<T>`, which contains an `IsSuccess` flag, an optional `Value`, and a list of `DiagnosticMessage` records. Each diagnostic message carries a `MessageCode`, a `Severity` (Info, Warning, or Error), a human-readable `Message` string, and an optional `SourceLocation` indicating the line, column, and length of the relevant source span. The result's `HasErrors` property may be used to check whether any error-level diagnostics were produced.
 
+Host applications that need to construct results programmatically (e.g. for early error returns before reaching the Jyro pipeline) can use the static factory methods:
+
+```csharp
+// Create a success result
+var success = JyroResult<JyroValue>.Success(myValue);
+
+// Create a failure result with a single diagnostic
+var failure = JyroResult<JyroValue>.Failure(
+    DiagnosticMessage.Error(MessageCode.RuntimeError, "Script not found"));
+
+// Check for any error-level diagnostics
+if (result.HasErrors) { ... }
+```
+
 The `JyroValue` returned on success can be converted back to .NET types through methods such as `ToStringValue()`, `ToDouble()`, `ToBoolean()`, `ToInt32()`, `ToInt64()`, and `ToObjectValue()`. The `ToJson()` method serializes the value to a JSON string. Compound values may be downcast via `AsObject()` or `AsArray()` to access `JyroObject` and `JyroArray` members respectively. A `JyroObject` exposes its entries through the `Properties` dictionary, and a `JyroArray` exposes its elements through the `Items` list.
+
+### Constructing JyroValues
+
+When building input data or return values from custom functions, JyroValues are constructed directly using the concrete subclasses:
+
+```csharp
+// Primitives
+var str = new JyroString("hello");
+var num = new JyroNumber(42);
+var flag = JyroBoolean.True;   // or JyroBoolean.False
+var nil = JyroNull.Instance;
+
+// Objects
+var obj = new JyroObject();
+obj.SetProperty("name", new JyroString("Alice"));
+obj.SetProperty("age", new JyroNumber(30));
+obj.SetProperty("active", JyroBoolean.True);
+
+// Arrays
+var arr = new JyroArray();
+arr.Add(new JyroString("one"));
+arr.Add(new JyroNumber(2));
+arr.Add(obj);
+```
+
+`JyroObject` also supports indexer access (`obj["key"] = value`), `TryGetValue`, `Remove`, and `Clear`. `JyroArray` supports indexer access, `Insert`, `RemoveAt`, and `Length`.
+
+For bulk conversion from .NET types, use `JyroValue.FromJson(jsonString)` to parse a JSON string, or `WithData(obj)` on the builder to convert any .NET object automatically.
 
 ## Diagnostics and Error Handling
 
@@ -96,6 +138,27 @@ public class FrenchTemplates : IMessageTemplateProvider
 var formatted = DiagnosticFormatter.formatLocalized(new FrenchTemplates(), msg);
 ```
 
+### Constructing Diagnostics
+
+Host applications that need to create diagnostic messages (e.g. for custom error results) can use the static factory methods on `DiagnosticMessage`:
+
+```csharp
+// Create an error diagnostic
+var error = DiagnosticMessage.Error(
+    MessageCode.RuntimeError, "Script file not found");
+
+// Create with source location
+var located = DiagnosticMessage.Error(
+    MessageCode.RuntimeError, "Something went wrong",
+    location: SourceLocation.Create(10, 5));
+
+// Warning and Info follow the same pattern
+var warning = DiagnosticMessage.Warning(
+    MessageCode.FunctionOverride, "Overriding built-in");
+```
+
+Each `DiagnosticMessage` exposes `Code` (MessageCode), `Severity` (MessageSeverity), `Message` (string), `Args` (object[]), and `Location` (optional `SourceLocation` with `Line`, `Column`, and `Length` properties).
+
 ## Resource Limits
 
 Because Jyro is intended for executing untrusted code, the runtime supports configurable resource limits to prevent runaway scripts. Resource limits are **opt-in**: if no execution options are configured, no resource limiter is created and scripts run without constraints. This is appropriate for trusted environments such as CLI tools, but hosts executing untrusted code should always configure limits.
@@ -111,7 +174,39 @@ Limits are configured through `JyroExecutionOptions`, which may be supplied to t
 
 When a limit is exceeded, a `JyroRuntimeException` is raised and the result is returned as a failure with the corresponding diagnostic code (e.g., `StatementLimitExceeded`, `ExecutionTimeLimitExceeded`).
 
-A preconfigured `JyroExecutionOptions.Unlimited` value is also available, which sets all limits to their maximum representable values.
+### Direct Construction
+
+`JyroExecutionOptions` can also be constructed directly, which is useful for dependency injection or when configuring limits outside the builder:
+
+```csharp
+var options = new JyroExecutionOptions(
+    maxExecutionTime: TimeSpan.FromSeconds(10),
+    maxStatements: 20_000,
+    maxLoopIterations: 2_000,
+    maxCallDepth: 128);
+
+var result = new JyroBuilder()
+    .WithSource(script)
+    .WithJson(json)
+    .WithExecutionOptions(options)
+    .Execute();
+```
+
+Two preconfigured instances are provided: `JyroExecutionOptions.Default` (the values shown in the table above) and `JyroExecutionOptions.Unlimited`, which sets all limits to their maximum representable values.
+
+Note: `JyroExecutionOptions` is an immutable F# record and cannot be used with `services.Configure<T>()`. For dependency injection, register a singleton constructed from configuration:
+
+```csharp
+services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>().GetSection("Jyro");
+    return new JyroExecutionOptions(
+        maxExecutionTime: TimeSpan.FromSeconds(config.GetValue("MaxExecutionTimeSeconds", 10)),
+        maxStatements: config.GetValue("MaxStatements", 50_000),
+        maxLoopIterations: config.GetValue("MaxLoopIterations", 5_000),
+        maxCallDepth: config.GetValue("MaxCallDepth", 128));
+});
+```
 
 ```csharp
 var result = new JyroBuilder()
@@ -165,20 +260,47 @@ The Jyro standard library is included by default and provides built-in functions
 
 Host applications may extend the set of functions available to Jyro scripts by implementing the `IJyroFunction` interface or by subclassing `JyroFunctionBase`, which provides typed argument retrieval helpers such as `GetStringArgument`, `GetNumberArgument`, `GetArrayArgument`, and `GetObjectArgument`.
 
-A custom function must define a `Name` (the identifier by which it is called from scripts), a `Signature` (specifying parameter names, types, optionality, and return type), and an `Execute` method. The following example demonstrates a function that reverses a string:
+A custom function must define a `Name` (the identifier by which it is called from scripts), a `Signature` (specifying parameter names, types, optionality, and return type), and an `ExecuteImpl` method.
+
+### Function Signatures
+
+The `FunctionSignatures` module provides factory methods for common signature shapes:
+
+```csharp
+// One required argument: (name, argType, returnType)
+FunctionSignatures.unary("reverseString", ParameterType.StringParam, ParameterType.StringParam)
+
+// Two required arguments: (name, arg1Type, arg2Type, returnType)
+FunctionSignatures.binary("add", ParameterType.NumberParam, ParameterType.NumberParam, ParameterType.NumberParam)
+```
+
+For signatures with optional parameters, more than two arguments, or other custom shapes, `JyroFunctionSignature` can be constructed directly:
+
+```csharp
+new JyroFunctionSignature
+{
+    Name = "search",
+    Parameters = [
+        Parameter.Required("haystack", ParameterType.StringParam),
+        Parameter.Required("needle", ParameterType.StringParam),
+        Parameter.Optional("caseSensitive", ParameterType.BooleanParam)
+    ],
+    ReturnType = ParameterType.NumberParam,
+    MinArgs = 2,
+    MaxArgs = 3
+}
+```
+
+### Implementing a Custom Function
+
+The following example demonstrates a function that reverses a string:
 
 ```csharp
 public class ReverseStringFunction : JyroFunctionBase
 {
     public ReverseStringFunction() : base("reverseString",
-        new JyroFunctionSignature
-        {
-            Name = "reverseString",
-            Parameters = [Parameter.Required("value", ParameterType.StringParam)],
-            ReturnType = ParameterType.StringParam,
-            MinArgs = 1,
-            MaxArgs = 1
-        }) { }
+        FunctionSignatures.unary(
+            "reverseString", ParameterType.StringParam, ParameterType.StringParam)) { }
 
     public override JyroValue ExecuteImpl(
         IReadOnlyList<JyroValue> args, JyroExecutionContext ctx)
@@ -216,7 +338,36 @@ If a custom function is registered with the same name as a standard library func
 
 ## Precompilation
 
-For scenarios where the same script is executed repeatedly against different input data, the compilation overhead can be eliminated by precompiling the script to the `.jyrx` binary format. The compiled bytes may be stored, cached, or transmitted as needed and then loaded without repeating the parse, validate, or link stages.
+For scenarios where the same script is executed repeatedly against different input data, the compilation overhead can be eliminated by compiling once and reusing the result.
+
+### In-Memory Caching
+
+The `Compile` method returns a `JyroResult<CompiledProgram>`. The `CompiledProgram` can be cached in memory and re-executed directly via the `Compiler` module without going through the builder again:
+
+```csharp
+// Compile once (include any custom functions at compile time)
+var compileResult = new JyroBuilder()
+    .WithSource(script)
+    .AddFunction(new MyCustomFunction())
+    .Compile();
+
+CompiledProgram program = compileResult.Value;
+
+// Execute many times with different data (no resource limits)
+var result1 = Compiler.executeSimple(program, JyroValue.FromJson(json1));
+var result2 = Compiler.executeSimple(program, JyroValue.FromJson(json2));
+
+// Execute with resource limits
+var limiter = new JyroResourceLimiter(JyroExecutionOptions.Default);
+var ctx = new JyroExecutionContext(limiter);
+var result3 = Compiler.execute(program, data, ctx);
+```
+
+This is the recommended pattern for server applications where scripts are loaded once and executed per-request.
+
+### Binary Precompilation
+
+For scenarios where the compiled script needs to be stored on disk, transmitted over a network, or cached externally, the `.jyrx` binary format eliminates the parse, validate, and link stages entirely:
 
 ```csharp
 // Compile once
