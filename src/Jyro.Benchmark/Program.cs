@@ -337,6 +337,7 @@ internal static class Program
     {
         var data = ParseData(test.DataJson);
         var builder = new JyroBuilder()
+            .UseStdlib()
             .WithSource(test.Script)
             .WithData(data)
             .UseHttpFunctions();
@@ -348,6 +349,7 @@ internal static class Program
     {
         var data = ParseData(test.DataJson);
         var builder = new JyroBuilder()
+            .UseStdlib()
             .WithCompiledBytes(test.Compiled)
             .WithData(data)
             .UseHttpFunctions();

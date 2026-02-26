@@ -2,6 +2,7 @@ namespace Mesch.Jyro
 
 open System
 open System.Text.Json
+open System.Threading.Tasks
 
 /// Utility functions
 module UtilityFunctions =
@@ -160,6 +161,23 @@ module UtilityFunctions =
         override _.ExecuteImpl(args, _) =
             JyroString(args.[0].ToJson()) :> JyroValue
 
+    type SleepFunction() =
+        inherit JyroFunctionBase("Sleep",
+            FunctionSignatures.create "Sleep"
+                [ Parameter.Required("ms", NumberParam) ]
+                NullParam)
+        override this.ExecuteImpl(args, ctx) =
+            let msArg = this.GetArgument<JyroNumber>(args, 0)
+            if not msArg.IsInteger || msArg.Value < 0.0 then
+                JyroError.raiseRuntime MessageCode.NonNegativeIntegerRequired
+                    [| box "Sleep()"; box "a non-negative integer millisecond value"; box msArg.Value |]
+            // No-op in WASM — Task.Delay().GetResult() deadlocks on the single-threaded runtime
+            // because the timer callback can never fire while the thread is blocked.
+            if not (OperatingSystem.IsBrowser()) then
+                let ms = msArg.ToInteger()
+                Task.Delay(ms, ctx.CancellationToken).GetAwaiter().GetResult()
+            JyroNull.Instance :> JyroValue
+
     /// Get all utility functions
     let getAll () : IJyroFunction list =
         [ TypeOfFunction()
@@ -175,4 +193,5 @@ module UtilityFunctions =
           Base64EncodeFunction()
           Base64DecodeFunction()
           FromJsonFunction()
-          ToJsonFunction() ]
+          ToJsonFunction()
+          SleepFunction() ]

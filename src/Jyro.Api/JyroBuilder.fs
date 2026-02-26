@@ -11,7 +11,7 @@ type JyroBuilder() =
     let mutable compiledBytes: byte[] option = None
     let mutable data: JyroValue = JyroNull.Instance
     let functions = ResizeArray<IJyroFunction>()
-    let mutable includeStdlib = true
+    let mutable includeStdlib = false
     let mutable executionOptions: JyroExecutionOptions option = None
     let mutable cancellationToken: CancellationToken option = None
     let mutable stats: JyroPipelineStats option = None
@@ -53,9 +53,9 @@ type JyroBuilder() =
         functions.AddRange(funcs)
         this
 
-    /// Include or exclude standard library functions (included by default)
-    member this.UseStdlib(include': bool) =
-        includeStdlib <- include'
+    /// Include standard library functions (excluded by default)
+    member this.UseStdlib() =
+        includeStdlib <- true
         this
 
     /// Set execution options (resource limits)
@@ -176,6 +176,7 @@ module JyroBuilderFactory =
     /// Quick execute a script with data
     let executeScript (source: string) (data: obj) : JyroResult<JyroValue> =
         JyroBuilder()
+            .UseStdlib()
             .WithSource(source)
             .WithData(data)
             .Execute()
@@ -183,6 +184,7 @@ module JyroBuilderFactory =
     /// Quick execute a script with JSON data
     let executeScriptWithJson (source: string) (json: string) : JyroResult<JyroValue> =
         JyroBuilder()
+            .UseStdlib()
             .WithSource(source)
             .WithJson(json)
             .Execute()
@@ -194,6 +196,7 @@ type JyroExtensions =
     [<System.Runtime.CompilerServices.Extension>]
     static member ExecuteJyro(data: JyroValue, source: string) : JyroResult<JyroValue> =
         JyroBuilder()
+            .UseStdlib()
             .WithSource(source)
             .WithData(data)
             .Execute()
@@ -202,6 +205,7 @@ type JyroExtensions =
     [<System.Runtime.CompilerServices.Extension>]
     static member ExecuteJyro(data: obj, source: string) : JyroResult<JyroValue> =
         JyroBuilder()
+            .UseStdlib()
             .WithSource(source)
             .WithData(data)
             .Execute()

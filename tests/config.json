@@ -1,4 +1,4 @@
 {
-    "BinaryA": "C:\\GitHub\\MeschSystems\\jyro-cli\\src\\Jyro.Cli\\bin\\Release\\net10.0\\win-x64\\publish\\Jyro.exe",
+    "BinaryA": "C:\\GitHub\\MeschSystems\\jyro-cli\\src\\Jyro.Cli\\bin\\Debug\\net10.0\\Jyro.exe",
     "TimeoutSeconds": 30
 }

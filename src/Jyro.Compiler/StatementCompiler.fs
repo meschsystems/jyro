@@ -230,15 +230,30 @@ module StatementCompiler =
         let initEnd = Expression.Assign(endVar, endCompiled) :> Expression
         let initStep = Expression.Assign(stepVar, stepCompiled) :> Expression
 
-        // Validate step is positive — step <= 0 causes infinite loops
+        // Validate step is a positive integer — non-integer steps cause float drift, step <= 0 causes infinite loops
         let zeroValue = Expression.Constant(JyroNumber(0.0) :> JyroValue, typeof<JyroValue>) :> Expression
         let leOp = Expression.Constant(LessThanOrEqual, typeof<BinaryOp>)
         let stepLeZero = Expression.Call(stepVar, typeof<JyroValue>.GetMethod("EvaluateBinary"), leOp, zeroValue)
-        let stepInvalid = Expression.Call(stepLeZero, typeof<JyroValue>.GetMethod("ToBooleanTruthiness"))
+        let stepNotPositive = Expression.Call(stepLeZero, typeof<JyroValue>.GetMethod("ToBooleanTruthiness"))
+        let stepAsNumber = Expression.TypeAs(stepVar, typeof<JyroNumber>)
+        let stepNotInteger = Expression.OrElse(
+            Expression.Equal(stepAsNumber, Expression.Constant(null, typeof<JyroNumber>)),
+            Expression.Not(Expression.Property(stepAsNumber, "IsInteger")))
+        let stepInvalid = Expression.OrElse(stepNotPositive, stepNotInteger)
+        let stepErrorArgs = Expression.NewArrayInit(typeof<obj>,
+            Expression.Constant("for(step)" :> obj, typeof<obj>),
+            Expression.Constant("a positive integer step value" :> obj, typeof<obj>),
+            Expression.Convert(stepVar, typeof<obj>))
+        let stepErrorTemplate = MessageTemplates.get MessageCode.NonNegativeIntegerRequired
+        let stepErrorMessage = Expression.Call(
+            typeof<String>.GetMethod("Format", [| typeof<string>; typeof<obj[]> |]),
+            Expression.Constant(stepErrorTemplate, typeof<string>),
+            stepErrorArgs)
         let stepError = Expression.New(
-            typeof<JyroRuntimeException>.GetConstructor([| typeof<MessageCode>; typeof<string> |]),
-            Expression.Constant(MessageCode.ForLoopInvalidStep, typeof<MessageCode>),
-            Expression.Constant("For loop step must be a positive number", typeof<string>))
+            typeof<JyroRuntimeException>.GetConstructor([| typeof<MessageCode>; typeof<string>; typeof<obj[]> |]),
+            Expression.Constant(MessageCode.NonNegativeIntegerRequired, typeof<MessageCode>),
+            stepErrorMessage,
+            stepErrorArgs)
         let stepCheck = Expression.IfThen(stepInvalid, Expression.Throw(stepError)) :> Expression
 
         // Set up context with loop variable and labels

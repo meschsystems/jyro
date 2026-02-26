@@ -107,17 +107,15 @@ type MessageCode =
     | ScriptNotFound = 5503
 
     // 56xx — Control Flow & Expression
-    | ForLoopInvalidStep = 5600
-    | InvalidExpressionSyntax = 5601
-    | InvalidNumberParse = 5602
+    | InvalidExpressionSyntax = 5600
+    | InvalidNumberParse = 5601
 
     // 57xx — String & Pattern Operations (stdlib)
     | RegexTimeout = 5700
     | RegexInvalidPattern = 5701
     | PadLengthExceeded = 5702
-    | NegativeLength = 5703
-    | EmptyCharacterSet = 5704
-    | StringOrArrayRequired = 5705
+    | EmptyCharacterSet = 5703
+    | StringOrArrayRequired = 5704
 
     // 58xx — Date & Time Operations (stdlib)
     | DateParseError = 5800
@@ -132,10 +130,11 @@ type MessageCode =
     | LoopIterationLimitExceeded = 5901
     | CallDepthLimitExceeded = 5902
     | ExecutionTimeLimitExceeded = 5903
-    | IntegerRequired = 5950
-    | IncomparableTypes = 5951
-    | UnsupportedComparisonOperator = 5952
-    | Base64DecodeError = 5960
+    | IntegerRequired = 5904
+    | IncomparableTypes = 5905
+    | UnsupportedComparisonOperator = 5906
+    | NonNegativeIntegerRequired = 5907
+    | Base64DecodeError = 5908
 
 /// Source location information
 [<Struct>]
@@ -291,7 +290,6 @@ module MessageTemplates =
         templates.[MessageCode.ScriptNotFound] <- "Script '{0}' not found"
 
         // Runtime — Control Flow & Expression
-        templates.[MessageCode.ForLoopInvalidStep] <- "For loop step must be a positive number"
         templates.[MessageCode.InvalidExpressionSyntax] <- "{0}"
         templates.[MessageCode.InvalidNumberParse] <- "Cannot parse '{0}' as a number"
 
@@ -299,7 +297,6 @@ module MessageTemplates =
         templates.[MessageCode.RegexTimeout] <- "{0}: Pattern matching timed out"
         templates.[MessageCode.RegexInvalidPattern] <- "{0}: Invalid regex pattern - {1}"
         templates.[MessageCode.PadLengthExceeded] <- "{0} length {1} exceeds maximum allowed value of {2}"
-        templates.[MessageCode.NegativeLength] <- "{0} requires a non-negative integer length. Received: {1}"
         templates.[MessageCode.EmptyCharacterSet] <- "{0} character set cannot be empty"
         templates.[MessageCode.StringOrArrayRequired] <- "{0} requires a string or array as first argument"
 
@@ -319,6 +316,7 @@ module MessageTemplates =
         templates.[MessageCode.IntegerRequired] <- "{0} requires an integer {1}. Received: {2}"
         templates.[MessageCode.IncomparableTypes] <- "Cannot compare values of incompatible types: {0} and {1}. Relational operators (<, <=, >, >=) require both values to be numbers, strings, or booleans of the same type."
         templates.[MessageCode.UnsupportedComparisonOperator] <- "Unsupported comparison operator: '{0}'. Supported operators are: ==, !=, <, <=, >, >="
+        templates.[MessageCode.NonNegativeIntegerRequired] <- "{0} requires {1}. Received: {2}"
         templates.[MessageCode.Base64DecodeError] <- "Base64Decode() requires a valid Base64-encoded string. Error: {0}"
 
     /// Gets the default English template for a message code, or "{0}" if not found.

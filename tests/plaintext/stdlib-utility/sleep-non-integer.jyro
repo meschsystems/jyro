@@ -1,0 +1,2 @@
+# Test Sleep with non-integer value produces runtime error
+Sleep(1.5)

@@ -1,0 +1,4 @@
+# Test Sleep with a small valid duration
+Data.before = "set"
+Sleep(5)
+Data.after = "also set"

@@ -1,0 +1,2 @@
+# Test Sleep with negative value produces runtime error
+Sleep(-1)

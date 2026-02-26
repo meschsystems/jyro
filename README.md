@@ -22,6 +22,7 @@ The primary entry point for host applications is the `JyroBuilder` class, which 
 
 ```csharp
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithSource("return data.name")
     .WithJson("""{ "name": "Alice" }""")
     .Execute();
@@ -186,6 +187,7 @@ var options = new JyroExecutionOptions(
     maxCallDepth: 128);
 
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithSource(script)
     .WithJson(json)
     .WithExecutionOptions(options)
@@ -210,6 +212,7 @@ services.AddSingleton(sp =>
 
 ```csharp
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithSource(script)
     .WithJson(json)
     .WithMaxExecutionTime(TimeSpan.FromSeconds(2))
@@ -224,6 +227,7 @@ The resource limiter checks limits at statement, loop, and call boundaries. Howe
 ```csharp
 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithSource(script)
     .WithJson(json)
     .WithMaxExecutionTime(TimeSpan.FromSeconds(5))
@@ -242,6 +246,7 @@ Per-stage timing information can be collected by passing a `JyroPipelineStats` i
 ```csharp
 var stats = new JyroPipelineStats();
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithSource(script)
     .WithJson(json)
     .WithStats(stats)
@@ -254,7 +259,7 @@ Console.WriteLine($"Total: {stats.Total.TotalMilliseconds}ms");
 
 ## Standard Library
 
-The Jyro standard library is included by default and provides built-in functions for string manipulation, array operations, math, date/time handling, schema validation, querying, and general utilities. The standard library can be excluded by calling `UseStdlib(false)` on the builder, which may be useful when a minimal or fully custom function set is desired.
+The Jyro standard library provides built-in functions for string manipulation, array operations, math, date/time handling, schema validation, querying, and general utilities. The standard library is opt-in and can be included by calling `UseStdlib()` on the builder. Omitting the call excludes the standard library, which may be useful when a minimal or fully custom function set is desired.
 
 ## Custom Functions
 
@@ -316,6 +321,7 @@ Custom functions are registered on the builder via `AddFunction` or `AddFunction
 
 ```csharp
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithSource("return reverseString(data.text)")
     .WithJson("""{ "text": "hello" }""")
     .AddFunction(new ReverseStringFunction())
@@ -347,6 +353,7 @@ The `Compile` method returns a `JyroResult<CompiledProgram>`. The `CompiledProgr
 ```csharp
 // Compile once (include any custom functions at compile time)
 var compileResult = new JyroBuilder()
+    .UseStdlib()
     .WithSource(script)
     .AddFunction(new MyCustomFunction())
     .Compile();
@@ -372,6 +379,7 @@ For scenarios where the compiled script needs to be stored on disk, transmitted 
 ```csharp
 // Compile once
 var bytesResult = new JyroBuilder()
+    .UseStdlib()
     .WithSource(script)
     .CompileToBytes();
 
@@ -379,6 +387,7 @@ byte[] jyrxBytes = bytesResult.Value;
 
 // Execute many times
 var result = new JyroBuilder()
+    .UseStdlib()
     .WithCompiledBytes(jyrxBytes)
     .WithJson(json)
     .Execute();

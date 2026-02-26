@@ -269,7 +269,7 @@ module StringFunctions =
         override this.ExecuteImpl(args, _) =
             let lengthArg = this.GetArgument<JyroNumber>(args, 0)
             if not lengthArg.IsInteger || lengthArg.Value < 0.0 then
-                JyroError.raiseRuntime MessageCode.NegativeLength [| box "RandomString()"; box lengthArg.Value |]
+                JyroError.raiseRuntime MessageCode.NonNegativeIntegerRequired [| box "RandomString()"; box "a non-negative integer length"; box lengthArg.Value |]
             let length = lengthArg.ToInteger()
             let charset =
                 if args.Count > 1 then
