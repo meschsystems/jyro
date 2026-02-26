@@ -5,7 +5,7 @@
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<RootNamespace>Mesch.Jyro</RootNamespace>
 		<PackageId>Mesch.Jyro</PackageId>
-		<Version>0.9.3</Version>
+		<Version>0.9.30</Version>
 		<Authors>Mesch Systems</Authors>
 		<Description>Jyro language runtime and compiler</Description>
 		<IsPackable>true</IsPackable>
