@@ -135,6 +135,7 @@ Field-based query functions for filtering and projecting arrays of objects.
 | [Base64Encode](utility/Base64Encode.md) | Encodes a string to Base64 | No, returns new string | Yes (string) |
 | [Clone](utility/Clone.md) | Creates a deep copy of a value | No, returns new value | Yes |
 | [Coalesce](utility/Coalesce.md) | Returns the first non-null value from an array | No | Depends on result type |
+| [Diff](utility/Diff.md) | Compares two objects and returns added, removed, and changed properties | No, returns new object | Yes (object) |
 | [Equal](utility/Equal.md) | Tests deep equality of two values | No | No |
 | [FromJson](utility/FromJson.md) | Parses a JSON string into a Jyro value | No, returns new value | Depends on result type |
 | [HasProperty](utility/HasProperty.md) | Tests whether an object has a property (even if null) | No | No |

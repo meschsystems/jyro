@@ -1,0 +1,16 @@
+{
+  "result": {
+    "added": {
+      "email": "a@b.com"
+    },
+    "removed": {
+      "city": "NYC"
+    },
+    "changed": {
+      "age": {
+        "from": 30,
+        "to": 31
+      }
+    }
+  }
+}

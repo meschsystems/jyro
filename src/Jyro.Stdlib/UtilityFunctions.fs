@@ -178,6 +178,40 @@ module UtilityFunctions =
                 Task.Delay(ms, ctx.CancellationToken).GetAwaiter().GetResult()
             JyroNull.Instance :> JyroValue
 
+    type DiffFunction() =
+        inherit JyroFunctionBase("Diff", FunctionSignatures.binary "Diff" ObjectParam ObjectParam ObjectParam)
+        override this.ExecuteImpl(args, _) =
+            let obj1 = this.GetObjectArgument(args, 0)
+            let obj2 = this.GetObjectArgument(args, 1)
+
+            let added = JyroObject()
+            let removed = JyroObject()
+            let changed = JyroObject()
+
+            // Find removed and changed keys (iterate obj1)
+            for kvp in obj1.Properties do
+                match obj2.Properties.TryGetValue(kvp.Key) with
+                | true, v2 ->
+                    // Both null => no change; otherwise use deep equality
+                    if not (kvp.Value.IsNull && v2.IsNull) && not (kvp.Value.EqualsValue(v2)) then
+                        let pair = JyroObject()
+                        pair.SetProperty("from", kvp.Value)
+                        pair.SetProperty("to", v2)
+                        changed.SetProperty(kvp.Key, pair)
+                | false, _ ->
+                    removed.SetProperty(kvp.Key, kvp.Value)
+
+            // Find added keys (iterate obj2, skip those already in obj1)
+            for kvp in obj2.Properties do
+                if not (obj1.Properties.ContainsKey(kvp.Key)) then
+                    added.SetProperty(kvp.Key, kvp.Value)
+
+            let result = JyroObject()
+            result.SetProperty("added", added)
+            result.SetProperty("removed", removed)
+            result.SetProperty("changed", changed)
+            result :> JyroValue
+
     /// Get all utility functions
     let getAll () : IJyroFunction list =
         [ TypeOfFunction()
@@ -194,4 +228,5 @@ module UtilityFunctions =
           Base64DecodeFunction()
           FromJsonFunction()
           ToJsonFunction()
-          SleepFunction() ]
+          SleepFunction()
+          DiffFunction() ]

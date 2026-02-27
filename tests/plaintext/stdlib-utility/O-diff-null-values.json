@@ -1,0 +1,16 @@
+{
+  "result": {
+    "added": {
+      "d": null
+    },
+    "removed": {
+      "c": null
+    },
+    "changed": {
+      "b": {
+        "from": 1,
+        "to": null
+      }
+    }
+  }
+}

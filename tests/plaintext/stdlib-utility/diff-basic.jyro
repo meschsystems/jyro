@@ -1,0 +1,4 @@
+# Test Diff() with added, removed, and changed properties
+var old = {name: "Alice", age: 30, city: "NYC"}
+var updated = {name: "Alice", age: 31, email: "a@b.com"}
+Data.result = Diff(old, updated)

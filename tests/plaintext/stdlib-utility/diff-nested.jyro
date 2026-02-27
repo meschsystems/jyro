@@ -1,0 +1,7 @@
+# Test Diff() treats nested objects as atomic values
+var old = {user: {name: "Alice", role: "admin"}, score: 100}
+var updated = {user: {name: "Alice", role: "editor"}, score: 100}
+Data.result = Diff(old, updated)
+
+# User can drill deeper manually
+Data.userDiff = Diff(old.user, updated.user)

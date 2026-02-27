@@ -1,0 +1,4 @@
+# Test Diff() with null property values
+var old = {a: null, b: 1, c: null}
+var updated = {a: null, b: null, d: null}
+Data.result = Diff(old, updated)

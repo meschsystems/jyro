@@ -1,0 +1,4 @@
+# Test Diff() when value type changes for the same key
+var old = {config: {debug: true}, count: 5, label: "test"}
+var updated = {config: "flat", count: "five", label: "test"}
+Data.result = Diff(old, updated)

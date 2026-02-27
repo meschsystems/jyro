@@ -1,0 +1,7 @@
+# Test Diff() with identical objects returns empty categories
+var a = {x: 1, y: "hello", z: true}
+var b = {x: 1, y: "hello", z: true}
+Data.result = Diff(a, b)
+Data.noAdded = Keys(Data.result.added)
+Data.noRemoved = Keys(Data.result.removed)
+Data.noChanged = Keys(Data.result.changed)

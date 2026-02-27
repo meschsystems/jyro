@@ -1,0 +1,21 @@
+{
+  "bothEmpty": {
+    "added": {},
+    "removed": {},
+    "changed": {}
+  },
+  "emptyToFull": {
+    "added": {
+      "a": 1
+    },
+    "removed": {},
+    "changed": {}
+  },
+  "fullToEmpty": {
+    "added": {},
+    "removed": {
+      "a": 1
+    },
+    "changed": {}
+  }
+}

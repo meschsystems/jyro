@@ -1,0 +1,28 @@
+{
+  "result": {
+    "added": {},
+    "removed": {},
+    "changed": {
+      "user": {
+        "from": {
+          "name": "Alice",
+          "role": "admin"
+        },
+        "to": {
+          "name": "Alice",
+          "role": "editor"
+        }
+      }
+    }
+  },
+  "userDiff": {
+    "added": {},
+    "removed": {},
+    "changed": {
+      "role": {
+        "from": "admin",
+        "to": "editor"
+      }
+    }
+  }
+}

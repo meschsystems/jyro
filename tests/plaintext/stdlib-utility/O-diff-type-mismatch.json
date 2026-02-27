@@ -1,0 +1,18 @@
+{
+  "result": {
+    "added": {},
+    "removed": {},
+    "changed": {
+      "config": {
+        "from": {
+          "debug": true
+        },
+        "to": "flat"
+      },
+      "count": {
+        "from": 5,
+        "to": "five"
+      }
+    }
+  }
+}
