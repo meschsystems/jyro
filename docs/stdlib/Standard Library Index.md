@@ -136,14 +136,12 @@ Field-based query functions for filtering and projecting arrays of objects.
 | [Clone](utility/Clone.md) | Creates a deep copy of a value | No, returns new value | Yes |
 | [Coalesce](utility/Coalesce.md) | Returns the first non-null value from an array | No | Depends on result type |
 | [Diff](utility/Diff.md) | Compares two objects and returns added, removed, and changed properties | No, returns new object | Yes (object) |
-| [Equal](utility/Equal.md) | Tests deep equality of two values | No | No |
 | [FromJson](utility/FromJson.md) | Parses a JSON string into a Jyro value | No, returns new value | Depends on result type |
 | [HasProperty](utility/HasProperty.md) | Tests whether an object has a property (even if null) | No | No |
 | [Keys](utility/Keys.md) | Returns all property names as an array | No, returns new array | Yes (array) |
 | [Merge](utility/Merge.md) | Merges multiple objects into a new object | No, returns new object | Yes (object) |
 | [NewGuid](utility/NewGuid.md) | Generates a new UUID v4 string | No | No |
 | [Sleep](utility/Sleep.md) | Pauses execution for a specified number of milliseconds | No, returns null | No |
-| [NotEqual](utility/NotEqual.md) | Tests deep inequality of two values | No | No |
 | [ToBoolean](utility/ToBoolean.md) | Converts a value to boolean using Jyro truthiness rules | No | No |
 | [ToJson](utility/ToJson.md) | Converts a Jyro value to a JSON string | No, returns new string | Yes (string) |
 | [ToString](utility/ToString.md) | Converts a value to its string representation | No, returns new string | Yes (string) |
