@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -9,8 +9,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="FSharp.Core" Version="10.0.102" />
-		<PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+		<PackageReference Include="FSharp.Core" Version="10.0.103" />
+		<PackageReference Include="System.CommandLine" Version="2.0.3" />
 		<ProjectReference Include="..\Jyro.Api\Jyro.Api.fsproj" />
 		<ProjectReference Include="..\Jyro.Core\Jyro.Core.fsproj" />
 		<ProjectReference Include="..\Jyro.Compiler\Jyro.Compiler.fsproj" />

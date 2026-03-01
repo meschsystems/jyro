@@ -24,7 +24,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="JsonSchema.Net" Version="9.0.0" />
+		<PackageReference Include="JsonSchema.Net" Version="9.1.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="FSharp.Core" Version="10.0.103" />
 	</ItemGroup>
 
 </Project>

@@ -42,6 +42,6 @@ var byName = SortBy(users, (u) => u.name)
 
 # Sort numbers by absolute value
 var numbers = [-5, 3, -1, 4]
-var byAbs = SortBy(numbers, (x) => Abs(x))
+var byAbs = SortBy(numbers, (x) => Absolute(x))
 # byAbs = [-1, 3, 4, -5]
 ```

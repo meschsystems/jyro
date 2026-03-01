@@ -67,7 +67,7 @@ Higher-order functions that accept inline lambda expressions as arguments.
 
 | Function | Description | Mutates | Chainable |
 |----------|-------------|---------|-----------|
-| [Abs](math/Abs.md) | Returns the absolute value of a number | No | No |
+| [Absolute](math/Absolute.md) | Returns the absolute value of a number | No | No |
 | [Average](math/Average.md) | Returns the arithmetic mean of numeric values | No | No |
 | [Ceiling](math/Ceiling.md) | Rounds up to the nearest integer | No | No |
 | [Clamp](math/Clamp.md) | Constrains a number to a min/max range | No | No |

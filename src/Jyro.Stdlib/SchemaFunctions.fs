@@ -29,6 +29,12 @@ module SchemaFunctions =
                     elif obj.Properties.[fieldName].ValueType = JyroValueType.Null then
                         isValid <- false
                         errors.Add(JyroString(sprintf "Field is null: %s" fieldName))
+                    else
+                        match obj.Properties.[fieldName] with
+                        | :? JyroString as str when System.String.IsNullOrWhiteSpace(str.Value) ->
+                            isValid <- false
+                            errors.Add(JyroString(sprintf "Field is empty: %s" fieldName))
+                        | _ -> ()
                 | _ -> ()
 
             result.SetProperty("valid", JyroBoolean.FromBoolean(isValid))

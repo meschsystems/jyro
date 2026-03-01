@@ -1,9 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Threading;
 using Mesch.Jyro;
 using Mesch.Jyro.Http;
 using Microsoft.FSharp.Core;
@@ -37,45 +35,59 @@ internal sealed class TestResult
 
 internal static class Program
 {
-    private static int Main(string[] args)
+    private static async Task<int> Main(string[] args)
     {
-        var testsDirOption = new Option<DirectoryInfo?>(
-            aliases: ["--tests-dir", "-t"],
-            description: "Path to the tests directory containing plaintext/ and binaries/ folders.")
+        var testsDirOption = new Option<DirectoryInfo?>("--tests-dir")
         {
-            IsRequired = false
+            Description = "Path to the tests directory containing plaintext/ and binaries/ folders."
+        };
+        testsDirOption.Aliases.Add("-t");
+
+        var categoryOption = new Option<string?>("--category")
+        {
+            Description = "Run only tests in the specified category folder name."
+        };
+        categoryOption.Aliases.Add("-c");
+
+        var iterationsOption = new Option<int>("--iterations")
+        {
+            Description = "Number of measured iterations per test.",
+            DefaultValueFactory = _ => 30
+        };
+        iterationsOption.Aliases.Add("-n");
+
+        var warmupOption = new Option<int>("--warmup")
+        {
+            Description = "Number of warmup iterations (discarded) before measured runs.",
+            DefaultValueFactory = _ => 2
+        };
+        warmupOption.Aliases.Add("-w");
+
+        var timeoutOption = new Option<int>("--timeout")
+        {
+            Description = "Per-test timeout in seconds.",
+            DefaultValueFactory = _ => 10
         };
 
-        var categoryOption = new Option<string?>(
-            aliases: ["--category", "-c"],
-            description: "Run only tests in the specified category folder name.");
+        var rootCommand = new RootCommand("Jyro in-process benchmark: source vs compiled performance comparison.");
+        rootCommand.Options.Add(testsDirOption);
+        rootCommand.Options.Add(categoryOption);
+        rootCommand.Options.Add(iterationsOption);
+        rootCommand.Options.Add(warmupOption);
+        rootCommand.Options.Add(timeoutOption);
 
-        var iterationsOption = new Option<int>(
-            aliases: ["--iterations", "-n"],
-            description: "Number of measured iterations per test.",
-            getDefaultValue: () => 30);
-
-        var warmupOption = new Option<int>(
-            aliases: ["--warmup", "-w"],
-            description: "Number of warmup iterations (discarded) before measured runs.",
-            getDefaultValue: () => 2);
-
-        var timeoutOption = new Option<int>(
-            aliases: ["--timeout"],
-            description: "Per-test timeout in seconds.",
-            getDefaultValue: () => 10);
-
-        var rootCommand = new RootCommand("Jyro in-process benchmark: source vs compiled performance comparison.")
+        rootCommand.SetAction(parseResult =>
         {
-            testsDirOption,
-            categoryOption,
-            iterationsOption,
-            warmupOption,
-            timeoutOption
-        };
+            Run(
+                parseResult.GetValue(testsDirOption),
+                parseResult.GetValue(categoryOption),
+                parseResult.GetValue(iterationsOption),
+                parseResult.GetValue(warmupOption),
+                parseResult.GetValue(timeoutOption)
+            );
+        });
 
-        rootCommand.SetHandler(Run, testsDirOption, categoryOption, iterationsOption, warmupOption, timeoutOption);
-        return rootCommand.Invoke(args);
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 
     private static void Run(DirectoryInfo? testsDirInfo, string? category, int iterations, int warmup, int timeoutSeconds)
@@ -107,7 +119,10 @@ internal static class Program
         {
             WriteError($"No test triplets found under {testsDir}");
             if (category != null)
+            {
                 Console.WriteLine($"  (filtered by category: {category})");
+            }
+
             return;
         }
 
@@ -135,7 +150,9 @@ internal static class Program
 
             // Category filter
             if (category != null && !string.Equals(group, category, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
 
             // Require expected output file
             var outFile = Path.Combine(dir, $"O-{baseName}.json");
@@ -251,7 +268,9 @@ internal static class Program
 
             // -- Skip error-handling tests (both fail = test is designed to fail) --
             if (!srcPassed && !cmpPassed)
+            {
                 continue;
+            }
 
             // -- Group header (deferred until we have a passing test) --
             if (test.Group != currentGroup)
@@ -305,9 +324,14 @@ internal static class Program
             }
             Console.WriteLine();
             if (srcError != null)
+            {
                 WriteColored($"      SRC: {srcError}", ConsoleColor.DarkRed);
+            }
+
             if (cmpError != null)
+            {
                 WriteColored($"      CMP: {cmpError}", ConsoleColor.DarkRed);
+            }
 
             results.Add(new TestResult
             {
@@ -375,7 +399,10 @@ internal static class Program
     private static JyroValue ParseData(string? dataJson)
     {
         if (string.IsNullOrWhiteSpace(dataJson))
+        {
             return JyroValue.FromJson("{}", FSharpOption<JsonSerializerOptions>.None);
+        }
+
         return JyroValue.FromJson(dataJson, FSharpOption<JsonSerializerOptions>.None);
     }
 
@@ -384,14 +411,26 @@ internal static class Program
         var sorted = (double[])values.Clone();
         Array.Sort(sorted);
         var n = sorted.Length;
-        if (n == 0) return 0;
-        if (n % 2 == 1) return sorted[n / 2];
+        if (n == 0)
+        {
+            return 0;
+        }
+
+        if (n % 2 == 1)
+        {
+            return sorted[n / 2];
+        }
+
         return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
     }
 
     private static double StdDev(double[] values)
     {
-        if (values.Length < 2) return 0;
+        if (values.Length < 2)
+        {
+            return 0;
+        }
+
         var mean = values.Average();
         var sumSq = values.Sum(v => (v - mean) * (v - mean));
         return Math.Sqrt(sumSq / (values.Length - 1));
@@ -426,7 +465,7 @@ internal static class Program
             var gCmp = Math.Round(g.Sum(r => r.CmpMedianMs), 1);
             var gSpd = gCmp > 0 ? Math.Round(gSrc / gCmp, 2) : 0;
             var gColor = gSpd >= 1 ? ConsoleColor.Green : ConsoleColor.Red;
-            WriteColored($"    {g.Key.PadRight(24)}{gSrc}ms -> {gCmp}ms  ({gSpd}x)", gColor);
+            WriteColored($"    {g.Key,-24}{gSrc}ms -> {gCmp}ms  ({gSpd}x)", gColor);
         }
 
         // Top 5 biggest speedups
@@ -437,7 +476,7 @@ internal static class Program
             WriteColored("  Biggest speedups:", ConsoleColor.DarkGray);
             foreach (var t in sorted.Take(5))
             {
-                WriteColored($"    {$"{t.Group}/{t.Name}".PadRight(44)}{t.Speedup}x", ConsoleColor.Green);
+                WriteColored($"    {$"{t.Group}/{t.Name}",-44}{t.Speedup}x", ConsoleColor.Green);
             }
         }
 
@@ -449,7 +488,7 @@ internal static class Program
             WriteColored("  Regressions (compiled slower):", ConsoleColor.Red);
             foreach (var t in regressions)
             {
-                WriteColored($"    {$"{t.Group}/{t.Name}".PadRight(44)}{t.Speedup}x", ConsoleColor.Red);
+                WriteColored($"    {$"{t.Group}/{t.Name}",-44}{t.Speedup}x", ConsoleColor.Red);
             }
         }
 

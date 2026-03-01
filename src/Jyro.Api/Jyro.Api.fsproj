@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>.net8.0</TargetFramework>
@@ -36,6 +36,10 @@
 		<ProjectReference Include="..\Jyro.Parser\Jyro.Parser.fsproj" PrivateAssets="all" />
 		<ProjectReference Include="..\Jyro.Compiler\Jyro.Compiler.fsproj" PrivateAssets="all" />
 		<ProjectReference Include="..\Jyro.Stdlib\Jyro.Stdlib.fsproj" PrivateAssets="all" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Update="FSharp.Core" Version="10.0.103" />
 	</ItemGroup>
 
 	<Target Name="IncludeProjectOutputInPackage" AfterTargets="Build">

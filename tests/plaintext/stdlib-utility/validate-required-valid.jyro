@@ -1,0 +1,3 @@
+# Test ValidateRequired with all fields valid
+var user = {name: "Alice", email: "alice@example.com", age: 30}
+Data.result = ValidateRequired(user, ["name", "email", "age"])

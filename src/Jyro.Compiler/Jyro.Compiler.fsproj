@@ -21,4 +21,8 @@
 		<ProjectReference Include="..\Jyro.Stdlib\Jyro.Stdlib.fsproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <PackageReference Update="FSharp.Core" Version="10.0.103" />
+	</ItemGroup>
+
 </Project>

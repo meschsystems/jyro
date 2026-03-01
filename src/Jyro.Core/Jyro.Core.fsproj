@@ -19,4 +19,8 @@
 		<Compile Include="JyroFunctionBase.fs" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <PackageReference Update="FSharp.Core" Version="10.0.103" />
+	</ItemGroup>
+
 </Project>

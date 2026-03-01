@@ -1,11 +1,11 @@
-# Abs
+# Absolute
 
 Returns the absolute value of a number.
 
 ## Signature
 
 ```
-Abs(number value)
+Absolute(number value)
 ```
 
 ## Parameters
@@ -23,15 +23,15 @@ Computes the absolute value using `Math.Abs`. Negative values are returned as th
 ## Examples
 
 ```jyro
-var result = Abs(-42)
+var result = Absolute(-42)
 # result = 42
 
-var zero = Abs(0)
+var zero = Absolute(0)
 # zero = 0
 
-var positive = Abs(3.14)
+var positive = Absolute(3.14)
 # positive = 3.14
 
-var negativeDecimal = Abs(-0.5)
+var negativeDecimal = Absolute(-0.5)
 # negativeDecimal = 0.5
 ```

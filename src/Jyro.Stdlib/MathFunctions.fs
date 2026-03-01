@@ -7,8 +7,8 @@ open System.Security.Cryptography
 /// Math functions
 module MathFunctions =
 
-    type AbsFunction() =
-        inherit JyroFunctionBase("Abs", FunctionSignatures.unary "Abs" NumberParam NumberParam)
+    type AbsoluteFunction() =
+        inherit JyroFunctionBase("Absolute", FunctionSignatures.unary "Absolute" NumberParam NumberParam)
         override this.ExecuteImpl(args, _) =
             let n = this.GetNumberArgument(args, 0)
             JyroNumber(Math.Abs(n)) :> JyroValue
@@ -185,7 +185,7 @@ module MathFunctions =
 
     /// Get all math functions
     let getAll () : IJyroFunction list =
-        [ AbsFunction()
+        [ AbsoluteFunction()
           FloorFunction()
           CeilingFunction()
           MinFunction()
