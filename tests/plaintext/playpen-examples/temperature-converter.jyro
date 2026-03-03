@@ -20,7 +20,7 @@ else
 end
 
 # Build a summary
-Data.summary = celsius + "°C is " + fahrenheit + "°F — that's " + Data.category
+Data.summary = celsius + "°C is " + fahrenheit + "°F - that's " + Data.category
 
 # Batch convert a list
 var temps = [0, 15, 28, 37, 100]

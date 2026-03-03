@@ -14,59 +14,77 @@ type MessageSeverity =
 /// Googleable as JMXXXX (e.g. JM5200 = Division by zero).
 type MessageCode =
     // Lexical Analysis Errors (1xxx)
-    // 10xx — General
+    // 10xx - General
     | UnknownLexerError = 1000
-    // 11xx — Character errors
+    // 11xx - Character errors
     | UnexpectedCharacter = 1100
-    // 12xx — Literal errors
+    // 12xx - Literal errors
     | UnterminatedString = 1200
 
     // Parsing Errors (2xxx)
-    // 20xx — General
+    // 20xx - General
     | UnknownParserError = 2000
-    // 21xx — Token errors
+    // 21xx - Token errors
     | UnexpectedToken = 2100
     | MissingToken = 2101
-    // 22xx — Literal/format errors
+    // 22xx - Literal/format errors
     | InvalidNumberFormat = 2200
 
     // Validation Errors (3xxx)
-    // 30xx — General
+    // 30xx - General
     | UnknownValidatorError = 3000
-    // 31xx — Variable declaration
+    // 31xx - Variable declaration
     | UndeclaredVariable = 3100
     | VariableAlreadyDeclared = 3101
     | ReservedIdentifier = 3102
-    // 32xx — Assignment
+    // 32xx - Assignment
     | InvalidAssignmentTarget = 3200
-    // 33xx — Type
+    // 33xx - Type
     | TypeMismatch = 3300
-    // 34xx — Control flow
+    // 34xx - Control flow
     | LoopStatementOutsideOfLoop = 3400
     | ExcessiveLoopNesting = 3401
     | NotIterableLiteral = 3402
     | UnreachableCode = 3403
+    // 35xx - Functions
+    | FunctionNotAtTopLevel = 3500
+    | NestedFunctionDeclaration = 3501
+    | DuplicateParameterName = 3502
+    | ReservedParameterName = 3503
+    | DataAccessInFunction = 3504
+    | ReturnOutsideFunction = 3505
+    // 36xx - Unions/Match
+    | UnionNotAtTopLevel = 3600
+    | DuplicateVariantName = 3601
+    | MatchNotExhaustive = 3602
+    | MatchDuplicateCase = 3603
+    | MatchBindingCountMismatch = 3604
+    | UnionInsideFunction = 3605
+    | MatchUnknownVariant = 3606
 
     // Linking Errors (4xxx)
-    // 40xx — General
+    // 40xx - General
     | UnknownLinkerError = 4000
-    // 41xx — Function resolution
+    // 41xx - Function resolution
     | UndefinedFunction = 4100
     | DuplicateFunction = 4101
     | FunctionOverride = 4102
-    // 42xx — Argument validation
+    // 42xx - Argument validation
     | TooFewArguments = 4200
     | TooManyArguments = 4201
+    // 43xx - Union linking
+    | VariantShadowsFunction = 4300
+    | FunctionShadowsVariant = 4301
 
     // Execution / Runtime Errors (5xxx)
-    // 50xx — General / System
+    // 50xx - General / System
     | ScriptReturn = 5000
     | UnknownExecutorError = 5001
     | RuntimeError = 5002
     | CancelledByHost = 5003
     | ScriptFailure = 5004
 
-    // 51xx — Type & Casting
+    // 51xx - Type & Casting
     | InvalidType = 5100
     | InvalidArgumentType = 5101
     | InvalidCast = 5102
@@ -74,7 +92,7 @@ type MessageCode =
     | ArgumentTypeMismatch = 5104
     | CallbackExpected = 5105
 
-    // 52xx — Arithmetic & Operators
+    // 52xx - Arithmetic & Operators
     | DivisionByZero = 5200
     | ModuloByZero = 5201
     | NegateNonNumber = 5202
@@ -85,7 +103,7 @@ type MessageCode =
     | UnsupportedUnaryOperation = 5207
     | UnknownOperator = 5208
 
-    // 53xx — Index & Property Access
+    // 53xx - Index & Property Access
     | IndexOutOfRange = 5300
     | NegativeIndex = 5301
     | IndexAccessOnNull = 5302
@@ -95,29 +113,29 @@ type MessageCode =
     | SetPropertyOnNonObject = 5306
     | SetIndexOnNonContainer = 5307
 
-    // 54xx — Type Checking & Iteration
+    // 54xx - Type Checking & Iteration
     | InvalidTypeCheck = 5400
     | UnknownTypeName = 5401
     | NotIterable = 5402
 
-    // 55xx — Function & Script Resolution
+    // 55xx - Function & Script Resolution
     | UndefinedFunctionRuntime = 5500
     | InvalidFunctionTarget = 5501
     | ScriptResolverNotConfigured = 5502
     | ScriptNotFound = 5503
 
-    // 56xx — Control Flow & Expression
+    // 56xx - Control Flow & Expression
     | InvalidExpressionSyntax = 5600
     | InvalidNumberParse = 5601
 
-    // 57xx — String & Pattern Operations (stdlib)
+    // 57xx - String & Pattern Operations (stdlib)
     | RegexTimeout = 5700
     | RegexInvalidPattern = 5701
     | PadLengthExceeded = 5702
     | EmptyCharacterSet = 5703
     | StringOrArrayRequired = 5704
 
-    // 58xx — Date & Time Operations (stdlib)
+    // 58xx - Date & Time Operations (stdlib)
     | DateParseError = 5800
     | DateFormatStringInvalid = 5801
     | DateFormatInvalid = 5802
@@ -125,7 +143,7 @@ type MessageCode =
     | DateUnitInvalid = 5804
     | DatePartInvalid = 5805
 
-    // 59xx — Resource Limits, Encoding & Collection Operations
+    // 59xx - Resource Limits, Encoding & Collection Operations
     | StatementLimitExceeded = 5900
     | LoopIterationLimitExceeded = 5901
     | CallDepthLimitExceeded = 5902
@@ -234,6 +252,19 @@ module MessageTemplates =
         templates.[MessageCode.ExcessiveLoopNesting] <- "Loop nesting exceeds maximum depth of {0}"
         templates.[MessageCode.UnreachableCode] <- "Unreachable code detected"
         templates.[MessageCode.NotIterableLiteral] <- "Value of type {0} is not iterable"
+        templates.[MessageCode.FunctionNotAtTopLevel] <- "Function '{0}' must be declared at the top level"
+        templates.[MessageCode.NestedFunctionDeclaration] <- "Function declarations cannot be nested inside other functions"
+        templates.[MessageCode.DuplicateParameterName] <- "Duplicate parameter '{0}' in function '{1}'"
+        templates.[MessageCode.ReservedParameterName] <- "Cannot use reserved name '{0}' as a parameter in function '{1}'"
+        templates.[MessageCode.DataAccessInFunction] <- "Cannot access Data inside a function. Pass it as a parameter instead."
+        templates.[MessageCode.ReturnOutsideFunction] <- "'return' can only be used inside a function. Use 'exit' to terminate the script."
+        templates.[MessageCode.UnionNotAtTopLevel] <- "Union '{0}' must be declared at the top level"
+        templates.[MessageCode.DuplicateVariantName] <- "Variant '{0}' is already defined in union '{1}'"
+        templates.[MessageCode.MatchNotExhaustive] <- "Match on union '{0}' is not exhaustive; missing case(s): {1}"
+        templates.[MessageCode.MatchDuplicateCase] <- "Duplicate case '{0}' in match statement"
+        templates.[MessageCode.MatchBindingCountMismatch] <- "Case '{0}' has {1} binding(s) but variant '{0}' has {2} field(s)"
+        templates.[MessageCode.UnionInsideFunction] <- "Union declarations cannot be inside functions"
+        templates.[MessageCode.MatchUnknownVariant] <- "Unknown variant '{0}' in match case"
 
         // Linker
         templates.[MessageCode.UnknownLinkerError] <- "{0}"
@@ -242,14 +273,16 @@ module MessageTemplates =
         templates.[MessageCode.FunctionOverride] <- "Function '{0}' overrides a built-in function"
         templates.[MessageCode.TooFewArguments] <- "Function '{0}' requires at least {1} arguments, but {2} were provided"
         templates.[MessageCode.TooManyArguments] <- "Function '{0}' accepts at most {1} arguments, but {2} were provided"
+        templates.[MessageCode.VariantShadowsFunction] <- "Variant constructor '{0}' shadows built-in function '{0}'"
+        templates.[MessageCode.FunctionShadowsVariant] <- "Function '{0}' shadows variant constructor '{0}'"
 
-        // Runtime — General
+        // Runtime - General
         templates.[MessageCode.UnknownExecutorError] <- "{0}"
         templates.[MessageCode.RuntimeError] <- "{0}"
         templates.[MessageCode.CancelledByHost] <- "Script execution was cancelled by the host"
         templates.[MessageCode.ScriptFailure] <- "{0}"
 
-        // Runtime — Type & Casting
+        // Runtime - Type & Casting
         templates.[MessageCode.InvalidType] <- "Cannot assign {0} to variable '{1}' of type {2}"
         templates.[MessageCode.InvalidArgumentType] <- "{0}"
         templates.[MessageCode.InvalidCast] <- "Cannot cast {0} to {1}"
@@ -257,7 +290,7 @@ module MessageTemplates =
         templates.[MessageCode.ArgumentTypeMismatch] <- "Expected {0} but got {1}"
         templates.[MessageCode.CallbackExpected] <- "{0} expected a lambda callback but got {1}"
 
-        // Runtime — Arithmetic & Operators
+        // Runtime - Arithmetic & Operators
         templates.[MessageCode.DivisionByZero] <- "Division by zero"
         templates.[MessageCode.ModuloByZero] <- "Modulo by zero"
         templates.[MessageCode.NegateNonNumber] <- "Cannot negate non-number value of type {0}"
@@ -268,7 +301,7 @@ module MessageTemplates =
         templates.[MessageCode.UnsupportedUnaryOperation] <- "Unsupported unary operation {0} for {1}"
         templates.[MessageCode.UnknownOperator] <- "Unknown operator '{0}'"
 
-        // Runtime — Index & Property Access
+        // Runtime - Index & Property Access
         templates.[MessageCode.IndexOutOfRange] <- "{0}"
         templates.[MessageCode.NegativeIndex] <- "Negative index: {0}"
         templates.[MessageCode.IndexAccessOnNull] <- "Cannot access index on null value"
@@ -278,29 +311,29 @@ module MessageTemplates =
         templates.[MessageCode.SetPropertyOnNonObject] <- "Cannot set property '{0}' on value of type {1}"
         templates.[MessageCode.SetIndexOnNonContainer] <- "Cannot set index on value of type {0}"
 
-        // Runtime — Type Checking & Iteration
+        // Runtime - Type Checking & Iteration
         templates.[MessageCode.InvalidTypeCheck] <- "{0}"
         templates.[MessageCode.UnknownTypeName] <- "Unknown type name '{0}'"
         templates.[MessageCode.NotIterable] <- "Value of type {0} is not iterable"
 
-        // Runtime — Function & Script Resolution
+        // Runtime - Function & Script Resolution
         templates.[MessageCode.UndefinedFunctionRuntime] <- "Undefined function '{0}'"
         templates.[MessageCode.InvalidFunctionTarget] <- "Cannot call value of type {0} as a function"
         templates.[MessageCode.ScriptResolverNotConfigured] <- "Script resolver is not configured"
         templates.[MessageCode.ScriptNotFound] <- "Script '{0}' not found"
 
-        // Runtime — Control Flow & Expression
+        // Runtime - Control Flow & Expression
         templates.[MessageCode.InvalidExpressionSyntax] <- "{0}"
         templates.[MessageCode.InvalidNumberParse] <- "Cannot parse '{0}' as a number"
 
-        // Runtime — String & Pattern Operations
+        // Runtime - String & Pattern Operations
         templates.[MessageCode.RegexTimeout] <- "{0}: Pattern matching timed out"
         templates.[MessageCode.RegexInvalidPattern] <- "{0}: Invalid regex pattern - {1}"
         templates.[MessageCode.PadLengthExceeded] <- "{0} length {1} exceeds maximum allowed value of {2}"
         templates.[MessageCode.EmptyCharacterSet] <- "{0} character set cannot be empty"
         templates.[MessageCode.StringOrArrayRequired] <- "{0} requires a string or array as first argument"
 
-        // Runtime — Date & Time Operations
+        // Runtime - Date & Time Operations
         templates.[MessageCode.DateParseError] <- "Unable to parse date: '{0}'"
         templates.[MessageCode.DateFormatStringInvalid] <- "Invalid date format string: '{0}'"
         templates.[MessageCode.DateFormatInvalid] <- "Invalid date format: '{0}'"
@@ -308,7 +341,7 @@ module MessageTemplates =
         templates.[MessageCode.DateUnitInvalid] <- "Invalid date unit: '{0}'. Valid units: {1}"
         templates.[MessageCode.DatePartInvalid] <- "Invalid date part: '{0}'. Valid parts: {1}"
 
-        // Runtime — Resource Limits, Encoding & Collection
+        // Runtime - Resource Limits, Encoding & Collection
         templates.[MessageCode.StatementLimitExceeded] <- "Script execution exceeded maximum statement limit of {0}"
         templates.[MessageCode.LoopIterationLimitExceeded] <- "Script execution exceeded maximum loop iteration limit of {0}"
         templates.[MessageCode.CallDepthLimitExceeded] <- "Script execution exceeded maximum call depth limit of {0}"

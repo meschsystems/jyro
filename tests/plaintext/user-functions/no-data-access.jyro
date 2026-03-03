@@ -1,0 +1,8 @@
+# Test that Data cannot be accessed inside a function (compile error)
+
+func BadFunc()
+    Data.x = 1
+    return null
+end
+
+Data.result = BadFunc()

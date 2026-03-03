@@ -54,6 +54,25 @@ module ExpressionParser =
         withPos (pLambdaParams .>> arrow .>>. pExpr)
         |>> fun ((params', body), pos) -> Lambda(params', body, pos)
 
+    // Match expression: match <expr> do case <Variant>[(bindings)] then <expr> ... end
+    let private pMatchExprCase : Parser<MatchExprCase, unit> =
+        withPos (
+            keyword "case" >>. anyIdentifier .>>.
+            (opt (attempt (between lparen rparen (sepBy identifier comma))) |>> Option.defaultValue []) .>>
+            keyword "then" .>>.
+            pExpr
+        )
+        |>> fun (((variantName, bindings), body), pos) ->
+            { VariantName = variantName; Bindings = bindings; Body = body; Pos = pos }
+
+    let private pMatchExpr : Parser<Expr, unit> =
+        withPos (
+            keyword "match" >>. pExpr .>> keyword "do" .>>.
+            many1 pMatchExprCase .>>
+            keyword "end"
+        )
+        |>> fun ((expr, cases), pos) -> MatchExpr(expr, cases, pos)
+
     // Primary expression (atom)
     let private pPrimary : Parser<Expr, unit> =
         choice [
@@ -64,6 +83,7 @@ module ExpressionParser =
             pStringLiteral
             pArrayLiteral
             pObjectLiteral
+            pMatchExpr
             pGroupedExpr
             pIdentifier
         ]

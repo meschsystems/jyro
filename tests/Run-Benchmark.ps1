@@ -242,7 +242,7 @@ foreach ($test in $tests) {
 
     Write-Host -NoNewline ("    " + $test.Name.PadRight(36))
 
-    # Warmup runs (discarded) — alternate src/cmp to warm both paths equally
+    # Warmup runs (discarded) - alternate src/cmp to warm both paths equally
     for ($i = 0; $i -lt $Warmup; $i++) {
         Invoke-TestRun -Binary $binary -InputFile $test.Script -ExpectedFile $test.Expected `
             -DataFile $test.Data -TimeoutMs $timeoutMs -ExpectedExitCode $test.ExpectedExitCode | Out-Null

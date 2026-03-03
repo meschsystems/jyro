@@ -1,0 +1,11 @@
+# Test that user function shadowing variant constructor is a linker error
+
+union Shape
+    Circle(radius: number)
+end
+
+func Circle(r)
+    return r
+end
+
+Data.result = Circle(5)

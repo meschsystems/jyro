@@ -11,23 +11,29 @@ module ExpressionCompiler =
         { Variables: Map<string, ParameterExpression>
           VariableTypes: Map<string, JyroType>
           Functions: Map<string, IJyroFunction>
+          UnionDefinitions: Map<string, UnionVariant list>
+          VariantToUnion: Map<string, string>
           DataParam: ParameterExpression
           ContextParam: ParameterExpression
           BreakLabel: LabelTarget option
           ContinueLabel: LabelTarget option
-          ReturnLabel: LabelTarget option }
+          ReturnLabel: LabelTarget option
+          InFunction: bool }
 
-        static member Create(functions: Map<string, IJyroFunction>) =
+        static member Create(functions: Map<string, IJyroFunction>, ?unionDefs: Map<string, UnionVariant list>, ?variantMap: Map<string, string>) =
             let dataParam = Expression.Parameter(typeof<JyroValue>, "Data")
             let contextParam = Expression.Parameter(typeof<JyroExecutionContext>, "ctx")
             { Variables = Map.empty
               VariableTypes = Map.empty
               Functions = functions
+              UnionDefinitions = defaultArg unionDefs Map.empty
+              VariantToUnion = defaultArg variantMap Map.empty
               DataParam = dataParam
               ContextParam = contextParam
               BreakLabel = None
               ContinueLabel = None
-              ReturnLabel = None }
+              ReturnLabel = None
+              InFunction = false }
 
         member this.WithVariable(name: string, param: ParameterExpression) =
             { this with Variables = this.Variables.Add(name, param) }
@@ -237,7 +243,7 @@ module ExpressionCompiler =
             let jyroFunc = JyroFunction(compiled, params'.Length) :> JyroValue
             Expression.Constant(jyroFunc, typeof<JyroValue>) :> Expression
         with :? InvalidOperationException ->
-            // Lambda captures outer scope variables — must embed in tree for runtime compilation
+            // Lambda captures outer scope variables - must embed in tree for runtime compilation
             let createMethod = typeof<JyroFunction>.GetMethod("Create",
                 [| typeof<Func<IReadOnlyList<JyroValue>, JyroValue>>; typeof<int> |])
             Expression.Call(createMethod, lambdaExpr, Expression.Constant(params'.Length)) :> Expression
@@ -337,6 +343,65 @@ module ExpressionCompiler =
         let fromBoolMethod = typeof<JyroBoolean>.GetMethod("FromBoolean")
         Expression.Call(fromBoolMethod, result) :> Expression
 
+    /// Compile a match expression as a chain of conditionals returning JyroValue
+    and private compileMatchExpr (ctx: CompilationContext) (expr: Expr) (cases: MatchExprCase list) : Expression =
+        let matchExpr = compileExpr ctx expr
+        let matchVar = Expression.Variable(typeof<JyroValue>, "matchVal")
+        let assignMatch = Expression.Assign(matchVar, matchExpr) :> Expression
+
+        // Extract _variant: matchVal.GetProperty("_variant").ToStringValue()
+        let getPropertyMethod = typeof<JyroValue>.GetMethod("GetProperty")
+        let toStringMethod = typeof<JyroValue>.GetMethod("ToStringValue")
+        let variantTagExpr =
+            Expression.Call(
+                Expression.Call(matchVar, getPropertyMethod, Expression.Constant("_variant", typeof<string>)),
+                toStringMethod)
+        let variantTagVar = Expression.Variable(typeof<string>, "variantTag")
+        let assignTag = Expression.Assign(variantTagVar, variantTagExpr) :> Expression
+
+        let rec buildCases (remaining: MatchExprCase list) : Expression =
+            match remaining with
+            | [] -> Expression.Constant(JyroNull.Instance, typeof<JyroValue>) :> Expression
+            | case :: rest ->
+                let testExpr =
+                    Expression.Equal(
+                        variantTagVar,
+                        Expression.Constant(case.VariantName, typeof<string>)) :> Expression
+
+                // Destructure fields
+                let unionName = ctx.VariantToUnion.[case.VariantName]
+                let variants = ctx.UnionDefinitions.[unionName]
+                let variant = variants |> List.find (fun v -> v.Name = case.VariantName)
+                let fieldNames = variant.Fields |> List.map fst
+
+                // Create binding variables and initialize from matchVar properties
+                let bindingVars = ResizeArray<ParameterExpression>()
+                let bindingInits = ResizeArray<Expression>()
+                let mutable caseCtx = ctx
+                for (bindingName, fieldName) in List.zip case.Bindings fieldNames do
+                    let bindVar = Expression.Variable(typeof<JyroValue>, bindingName)
+                    bindingVars.Add(bindVar)
+                    let getField = Expression.Call(matchVar, getPropertyMethod, Expression.Constant(fieldName, typeof<string>))
+                    bindingInits.Add(Expression.Assign(bindVar, getField) :> Expression)
+                    caseCtx <- caseCtx.WithVariable(bindingName, bindVar)
+
+                // Compile case body expression with bindings in scope
+                let bodyExpr = compileExpr caseCtx case.Body
+                let caseExpr =
+                    if bindingVars.Count > 0 then
+                        let allExprs = ResizeArray<Expression>()
+                        allExprs.AddRange(bindingInits)
+                        allExprs.Add(bodyExpr)
+                        Expression.Block(typeof<JyroValue>, bindingVars, allExprs) :> Expression
+                    else
+                        bodyExpr
+
+                let elseExpr = buildCases rest
+                Expression.Condition(testExpr, caseExpr, elseExpr, typeof<JyroValue>) :> Expression
+
+        let chain = buildCases cases
+        Expression.Block(typeof<JyroValue>, [| matchVar; variantTagVar |], [| assignMatch; assignTag; chain |]) :> Expression
+
     /// Compile an expression to an Expression Tree
     and compileExpr (ctx: CompilationContext) (expr: Expr) : Expression =
         match expr with
@@ -353,3 +418,4 @@ module ExpressionCompiler =
         | Lambda(params', body, _) -> compileLambda ctx params' body
         | TypeCheck(expr, jyroType, isNegated, _) -> compileTypeCheck ctx expr jyroType isNegated
         | IncrementDecrement(expr, isInc, isPre, _) -> compileIncrementDecrement ctx expr isInc isPre
+        | MatchExpr(expr, cases, _) -> compileMatchExpr ctx expr cases

@@ -1,0 +1,7 @@
+# Test that functions can be called before their declaration
+
+Data.result = Square(7)
+
+func Square(n: number)
+    return n * n
+end

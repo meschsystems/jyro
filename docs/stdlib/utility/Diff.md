@@ -16,9 +16,9 @@ Diff(object obj1, object obj2)
 ## Returns
 
 - **object**: An object with three properties:
-  - **added** — properties present in obj2 but not in obj1 (values from obj2)
-  - **removed** — properties present in obj1 but not in obj2 (values from obj1)
-  - **changed** — properties in both but with different values, each as `{from, to}`
+  - **added** - properties present in obj2 but not in obj1 (values from obj2)
+  - **removed** - properties present in obj1 but not in obj2 (values from obj1)
+  - **changed** - properties in both but with different values, each as `{from, to}`
 
 ## Description
 

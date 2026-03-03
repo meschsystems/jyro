@@ -21,11 +21,125 @@ module Compiler =
     /// <summary>Compiles a linked program into an executable delegate.</summary>
     /// <param name="linkedProgram">The linked program containing resolved function references and a validated AST.</param>
     /// <returns>A <see cref="JyroResult{T}"/> containing the compiled program on success, or diagnostic messages on failure.</returns>
+    /// <summary>Compiles a user function body into a delegate and sets it on the shell.</summary>
+    let private compileFuncBody
+        (allFunctions: Map<string, IJyroFunction>)
+        (unionDefs: Map<string, UnionVariant list>)
+        (variantMap: Map<string, string>)
+        (funcDef: Stmt)
+        (shell: JyroUserFunction) =
+        match funcDef with
+        | FuncDef(_, parameters, body, _) ->
+            // Create parameters for the function delegate: (args: IReadOnlyList<JyroValue>, ctx: JyroExecutionContext) -> JyroValue
+            let argsParam = Expression.Parameter(typeof<System.Collections.Generic.IReadOnlyList<JyroValue>>, "args")
+            let ctxParam = Expression.Parameter(typeof<JyroExecutionContext>, "ctx")
+
+            // Create the return label for this function
+            let returnLabel = Expression.Label(typeof<JyroValue>, "funcReturn")
+
+            // Build inner context: function parameters only, no DataParam, InFunction = true
+            // We give it a dummy DataParam that will never be used (validator prevents Data access)
+            let dummyData = Expression.Parameter(typeof<JyroValue>, "__noData")
+            let innerCtx =
+                { Variables = Map.empty
+                  VariableTypes = Map.empty
+                  Functions = allFunctions
+                  UnionDefinitions = unionDefs
+                  VariantToUnion = variantMap
+                  DataParam = dummyData
+                  ContextParam = ctxParam
+                  BreakLabel = None
+                  ContinueLabel = None
+                  ReturnLabel = Some returnLabel
+                  InFunction = true }
+
+            // Create parameter variables initialized from args[i] with optional type coercion
+            let itemGetter = typeof<System.Collections.Generic.IReadOnlyList<JyroValue>>.GetMethod("get_Item")
+            let coerceMethod = typeof<JyroValue>.GetMethod("CoerceToType")
+
+            let paramVars = ResizeArray<ParameterExpression>()
+            let paramInits = ResizeArray<Expression>()
+            let mutable funcCtx = innerCtx
+
+            parameters |> List.iteri (fun i (pName, typeHint) ->
+                let paramVar = Expression.Variable(typeof<JyroValue>, pName)
+                paramVars.Add(paramVar)
+
+                let getItem = Expression.Call(argsParam, itemGetter, Expression.Constant(i)) :> Expression
+                let initExpr =
+                    match typeHint with
+                    | Some hint when hint <> AnyType ->
+                        let targetType = ExpressionCompiler.jyroTypeToValueType hint
+                        Expression.Call(coerceMethod,
+                            getItem,
+                            Expression.Constant(targetType, typeof<JyroValueType>),
+                            Expression.Constant(pName, typeof<string>)) :> Expression
+                    | _ -> getItem
+
+                paramInits.Add(Expression.Assign(paramVar, initExpr) :> Expression)
+                funcCtx <- funcCtx.WithVariable(pName, paramVar)
+                match typeHint with
+                | Some hint -> funcCtx <- funcCtx.WithVariableType(pName, hint)
+                | None -> ())
+
+            // Compile the function body
+            let bodyExpr = compileBlock funcCtx body
+
+            // Build the full function body block
+            let allExprs = ResizeArray<Expression>()
+            allExprs.AddRange(paramInits)
+            allExprs.Add(bodyExpr)
+            // Return label defaults to null (implicit return)
+            allExprs.Add(Expression.Label(returnLabel, Expression.Constant(JyroNull.Instance, typeof<JyroValue>)) :> Expression)
+
+            let funcBody = Expression.Block(typeof<JyroValue>, paramVars, allExprs)
+            let funcLambda = Expression.Lambda<Func<System.Collections.Generic.IReadOnlyList<JyroValue>, JyroExecutionContext, JyroValue>>(
+                funcBody, argsParam, ctxParam)
+            let compiled = funcLambda.Compile()
+            shell.SetCompiled(compiled)
+        | _ -> failwith "Expected FuncDef"
+
     let compile (linkedProgram: LinkedProgram) : JyroResult<CompiledProgram> =
         try
+            // Build the combined function map: host/stdlib + user function shells + variant constructors
+            let allFunctions =
+                linkedProgram.UserFunctions
+                |> Map.fold (fun acc name shell -> Map.add name (shell :> IJyroFunction) acc) linkedProgram.Functions
+            let allFunctions =
+                linkedProgram.VariantConstructors
+                |> Map.fold (fun acc name ctor -> Map.add name (ctor :> IJyroFunction) acc) allFunctions
+
+            // Extract union definitions from AST for compilation context
+            let unionDefs =
+                linkedProgram.Program.Statements
+                |> List.choose (fun stmt ->
+                    match stmt with
+                    | UnionDef(name, variants, _) -> Some (name, variants)
+                    | _ -> None)
+                |> Map.ofList
+            let variantMap =
+                unionDefs
+                |> Map.toSeq
+                |> Seq.collect (fun (unionName, variants) ->
+                    variants |> List.map (fun v -> v.Name, unionName))
+                |> Map.ofSeq
+
+            // Compile user function bodies first (before main script body)
+            let funcDefs =
+                linkedProgram.Program.Statements
+                |> List.choose (fun stmt ->
+                    match stmt with
+                    | FuncDef(name, _, _, _) -> Some (name, stmt)
+                    | _ -> None)
+
+            for (name, funcDef) in funcDefs do
+                match linkedProgram.UserFunctions.TryFind(name) with
+                | Some shell -> compileFuncBody allFunctions unionDefs variantMap funcDef shell
+                | None -> ()
+
             // Create the return label first so statements can reference it
             let returnLabel = Expression.Label(typeof<JyroValue>, "return")
-            let baseCtx = CompilationContext.Create(linkedProgram.Functions)
+            let baseCtx = CompilationContext.Create(allFunctions, unionDefs = unionDefs, variantMap = variantMap)
             let ctx = baseCtx.WithReturnLabel(returnLabel)
             let bodyExpr = compileBlock ctx linkedProgram.Program.Statements
 
@@ -70,6 +184,12 @@ module Compiler =
 
             JyroResult<JyroValue>.Success(data)
         with
+        | :? JyroRuntimeException as ex when ex.Code = MessageCode.ScriptReturn ->
+            // Exit from within a function - treat as clean script termination
+            match ctx.Limiter with
+            | Some limiter -> limiter.Stop()
+            | None -> ()
+            JyroResult<JyroValue>.Success(data)
         | :? JyroRuntimeException as ex ->
             match ctx.Limiter with
             | Some limiter -> limiter.Stop()
@@ -180,7 +300,26 @@ module Compiler =
                     deserialized.RequiredFunctions
                     |> List.map (fun name -> name, funcMap.[name])
                     |> Map.ofList
-                let linkedProgram = { Program = deserialized.Program; Functions = resolvedFunctions }
+                // Reconstruct user function shells from FuncDef AST nodes
+                let userFunctions =
+                    deserialized.Program.Statements
+                    |> List.choose (fun stmt ->
+                        match stmt with
+                        | FuncDef(name, parameters, _, _) ->
+                            Some (name, JyroUserFunction.createShell name parameters)
+                        | _ -> None)
+                    |> Map.ofList
+                // Reconstruct variant constructors from UnionDef AST nodes
+                let variantConstructors =
+                    deserialized.Program.Statements
+                    |> List.choose (fun stmt ->
+                        match stmt with
+                        | UnionDef(unionName, variants, _) ->
+                            Some (variants |> List.map (fun v -> v.Name, JyroVariantConstructor.create unionName v))
+                        | _ -> None)
+                    |> List.concat
+                    |> Map.ofList
+                let linkedProgram = { Program = deserialized.Program; Functions = resolvedFunctions; UserFunctions = userFunctions; VariantConstructors = variantConstructors }
                 compile linkedProgram
         | _ -> JyroResult<CompiledProgram>.Failure(DiagnosticMessage.Error(MessageCode.UnknownParserError, "Failed to deserialize .jyrx file"))
 
@@ -221,7 +360,24 @@ module Compiler =
                     deserialized.RequiredFunctions
                     |> List.map (fun name -> name, funcMap.[name])
                     |> Map.ofList
-                let linkedProgram = { Program = deserialized.Program; Functions = resolvedFunctions }
+                let userFunctions =
+                    deserialized.Program.Statements
+                    |> List.choose (fun stmt ->
+                        match stmt with
+                        | FuncDef(name, parameters, _, _) ->
+                            Some (name, JyroUserFunction.createShell name parameters)
+                        | _ -> None)
+                    |> Map.ofList
+                let variantConstructors =
+                    deserialized.Program.Statements
+                    |> List.choose (fun stmt ->
+                        match stmt with
+                        | UnionDef(unionName, variants, _) ->
+                            Some (variants |> List.map (fun v -> v.Name, JyroVariantConstructor.create unionName v))
+                        | _ -> None)
+                    |> List.concat
+                    |> Map.ofList
+                let linkedProgram = { Program = deserialized.Program; Functions = resolvedFunctions; UserFunctions = userFunctions; VariantConstructors = variantConstructors }
                 JyroPipelineStats.TimeStage((fun t -> stats.Compile <- t), fun () -> compile linkedProgram)
         | _ -> JyroResult<CompiledProgram>.Failure(DiagnosticMessage.Error(MessageCode.UnknownParserError, "Failed to deserialize .jyrx file"))
 

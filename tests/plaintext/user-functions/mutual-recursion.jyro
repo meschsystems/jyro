@@ -1,0 +1,19 @@
+# Test mutual recursion between two functions
+
+func IsEven(n: number)
+    if n == 0 then
+        return true
+    end
+    return IsOdd(n - 1)
+end
+
+func IsOdd(n: number)
+    if n == 0 then
+        return false
+    end
+    return IsEven(n - 1)
+end
+
+Data.even4 = IsEven(4)
+Data.odd5 = IsOdd(5)
+Data.even7 = IsEven(7)

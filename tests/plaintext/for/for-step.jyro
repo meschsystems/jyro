@@ -14,7 +14,7 @@ for i in 0 to 15 by 3 do
 end
 Data.threes = threes
 
-# Test 3: Doubling (uses while — multiplicative step not expressible with for)
+# Test 3: Doubling (uses while - multiplicative step not expressible with for)
 var powers = []
 var i = 1
 while i <= 64 do

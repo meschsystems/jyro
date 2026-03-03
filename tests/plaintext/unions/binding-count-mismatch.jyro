@@ -1,0 +1,17 @@
+# Test that wrong number of bindings in case is a validation error
+
+union Shape
+    Circle(radius: number)
+    Rect(width: number, height: number)
+end
+
+func Describe(s)
+    match s do
+        case Circle(r, extra) then
+            return "circle"
+        case Rect(w, h) then
+            return "rect"
+    end
+end
+
+Data.result = Describe(Circle(1))

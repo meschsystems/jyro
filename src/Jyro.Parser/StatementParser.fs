@@ -117,10 +117,69 @@ module StatementParser =
         )
         |>> fun (((expr, cases), defaultCase), pos) -> Switch(expr, cases, defaultCase, pos)
 
+    // Function definition: func Name(param1, param2: type) ... end
+    let private pFuncParam =
+        identifier .>>. opt (colon >>. typeKeyword)
+
+    let private pFuncParams =
+        between lparen rparen (sepBy pFuncParam comma)
+
+    let private pFuncDef =
+        withPos (
+            keyword "func" >>. identifier .>>. pFuncParams .>>.
+            pBlock .>>
+            keyword "end"
+        )
+        |>> fun (((name, parameters), body), pos) ->
+            FuncDef(name, parameters, body, pos)
+
+    // Union declaration: union Name Variant1(field1: type, ...) Variant2(...) end
+    let private pVariantFields =
+        between lparen rparen (sepBy pFuncParam comma)
+
+    let private pVariant =
+        identifier .>>. (opt (attempt pVariantFields) |>> Option.defaultValue [])
+        |>> fun (name, fields) -> { Name = name; Fields = fields }
+
+    let private pUnionDef =
+        withPos (
+            keyword "union" >>. identifier .>>.
+            many1 (attempt pVariant) .>>
+            keyword "end"
+        )
+        |>> fun ((name, variants), pos) -> UnionDef(name, variants, pos)
+
+    // Match statement: match expr do case Variant(bindings) then block ... end
+    let private pMatchBindings =
+        between lparen rparen (sepBy identifier comma)
+
+    let private pMatchCase =
+        withPos (
+            keyword "case" >>. identifier .>>.
+            (opt (attempt pMatchBindings) |>> Option.defaultValue []) .>>
+            keyword "then" .>>.
+            pBlock
+        )
+        |>> fun (((variantName, bindings), body), pos) ->
+            { VariantName = variantName; Bindings = bindings; Body = body; Pos = pos }
+
+    let private pMatch =
+        withPos (
+            keyword "match" >>. parseExpr .>> keyword "do" .>>.
+            many1 pMatchCase .>>
+            keyword "end"
+        )
+        |>> fun ((expr, cases), pos) -> Match(expr, cases, pos)
+
     // Return statement (expression must be on same line as keyword)
     let private pReturn =
         withPos (keywordRaw "return" >>. optSameLineExpr)
         |>> fun (value, pos) -> Return(value, pos)
+
+    // Exit statement (expression must be on same line as keyword)
+    let private pExit =
+        withPos (keywordRaw "exit" >>. optSameLineExpr)
+        |>> fun (value, pos) -> Exit(value, pos)
 
     // Fail statement (message must be on same line as keyword)
     let private pFail =
@@ -145,13 +204,17 @@ module StatementParser =
     // All statements
     do pStmtRef.Value <-
         choice [
+            attempt pFuncDef
+            attempt pUnionDef
             attempt pVarDecl
             attempt pIf
             attempt pWhile
             attempt pFor
             attempt pForEach
             attempt pSwitch
+            attempt pMatch
             attempt pReturn
+            attempt pExit
             attempt pFail
             attempt pBreak
             attempt pContinue

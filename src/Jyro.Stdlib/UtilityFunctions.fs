@@ -171,7 +171,7 @@ module UtilityFunctions =
             if not msArg.IsInteger || msArg.Value < 0.0 then
                 JyroError.raiseRuntime MessageCode.NonNegativeIntegerRequired
                     [| box "Sleep()"; box "a non-negative integer millisecond value"; box msArg.Value |]
-            // No-op in WASM — Task.Delay().GetResult() deadlocks on the single-threaded runtime
+            // No-op in WASM - Task.Delay().GetResult() deadlocks on the single-threaded runtime
             // because the timer callback can never fire while the thread is blocked.
             if not (OperatingSystem.IsBrowser()) then
                 let ms = msArg.ToInteger()

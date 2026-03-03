@@ -1,0 +1,18 @@
+# Test multiple union declarations in one script
+
+union Color
+    Red()
+    Blue()
+end
+
+union Shape
+    Circle(radius: number)
+    Square(side: number)
+end
+
+var c = Circle(5)
+var color = Red()
+
+Data.shapeTag = c._variant
+Data.colorTag = color._variant
+Data.radius = c.radius

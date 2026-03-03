@@ -4,7 +4,7 @@ open System
 open System.Diagnostics
 
 /// Records per-stage timing for the Jyro compilation and execution pipeline.
-/// Mutable class — create one instance, pass it through the pipeline, then read results.
+/// Mutable class - create one instance, pass it through the pipeline, then read results.
 [<Sealed>]
 type JyroPipelineStats() =
     let mutable parse = TimeSpan.Zero

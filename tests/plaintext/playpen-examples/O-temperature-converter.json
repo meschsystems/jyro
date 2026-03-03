@@ -2,6 +2,6 @@
   "celsius": 28,
   "fahrenheit": 82.4,
   "category": "warm",
-  "summary": "28°C is 82.4°F — that's warm",
+  "summary": "28°C is 82.4°F - that's warm",
   "batch": [32, 59, 82.4, 98.6, 212]
 }

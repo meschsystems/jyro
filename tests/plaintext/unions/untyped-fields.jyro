@@ -1,0 +1,13 @@
+# Test union fields without type hints
+
+union Wrapper
+    Box(value)
+    Pair(first, second)
+end
+
+var b = Box("hello")
+var p = Pair(1, true)
+
+Data.boxValue = b.value
+Data.pairFirst = p.first
+Data.pairSecond = p.second

@@ -40,6 +40,11 @@ module StatementCompiler =
                             Expression.Constant(pos.Column))
             let rteCatch = Expression.Catch(rteParam, Expression.Throw(rteNewEx, body.Type), rteFilter)
 
+            // Re-throw JyroRuntimeException that already has location (skip wrapping)
+            let rtePassParam = Expression.Parameter(typeof<JyroRuntimeException>, "rtep")
+            let rtePassFilter = Expression.Property(rtePassParam, rteHasLocationProp)
+            let rtePassCatch = Expression.Catch(rtePassParam, Expression.Rethrow(body.Type), rtePassFilter)
+
             // Catch general exceptions and wrap as JyroRuntimeException with position
             let exParam = Expression.Parameter(typeof<Exception>, "ex")
             let exNewRte = Expression.New(rteCtor,
@@ -50,7 +55,7 @@ module StatementCompiler =
                             Expression.Constant(pos.Column))
             let exCatch = Expression.Catch(exParam, Expression.Throw(exNewRte, body.Type))
 
-            Expression.TryCatch(body, rteCatch, exCatch) :> Expression
+            Expression.TryCatch(body, rteCatch, rtePassCatch, exCatch) :> Expression
 
     // Cached MethodInfo for type hint coercion
     let private coerceToTypeMethod = typeof<JyroValue>.GetMethod("CoerceToType")
@@ -230,7 +235,7 @@ module StatementCompiler =
         let initEnd = Expression.Assign(endVar, endCompiled) :> Expression
         let initStep = Expression.Assign(stepVar, stepCompiled) :> Expression
 
-        // Validate step is a positive integer — non-integer steps cause float drift, step <= 0 causes infinite loops
+        // Validate step is a positive integer - non-integer steps cause float drift, step <= 0 causes infinite loops
         let zeroValue = Expression.Constant(JyroNumber(0.0) :> JyroValue, typeof<JyroValue>) :> Expression
         let leOp = Expression.Constant(LessThanOrEqual, typeof<BinaryOp>)
         let stepLeZero = Expression.Call(stepVar, typeof<JyroValue>.GetMethod("EvaluateBinary"), leOp, zeroValue)
@@ -297,7 +302,7 @@ module StatementCompiler =
             [| initStart; initEnd; initStep; stepCheck
                Expression.Loop(loopBody, breakLabel) :> Expression |]) :> Expression
 
-        // Return the original context — loop variable is scoped to the for block
+        // Return the original context - loop variable is scoped to the for block
         (loopExpr, ctx)
 
     /// Compile a foreach loop with iteration counting
@@ -332,6 +337,66 @@ module StatementCompiler =
             [| enumeratorVar; varParam |],
             [| Expression.Assign(enumeratorVar, getEnumeratorExpr) :> Expression
                Expression.Loop(checkedBody, breakLabel, continueLabel) :> Expression |]) :> Expression
+
+    /// Compile a match statement as a chain of if/else-if on _variant tag
+    and private compileMatch (ctx: CompilationContext) (expr: Expr) (cases: MatchCase list) : Expression =
+        let matchExpr = compileExpr ctx expr
+        let matchVar = Expression.Variable(typeof<JyroValue>, "matchVal")
+        let assignMatch = Expression.Assign(matchVar, matchExpr) :> Expression
+
+        // Extract _variant: matchVal.GetProperty("_variant").ToStringValue()
+        let getPropertyMethod = typeof<JyroValue>.GetMethod("GetProperty")
+        let toStringMethod = typeof<JyroValue>.GetMethod("ToStringValue")
+        let variantTagExpr =
+            Expression.Call(
+                Expression.Call(matchVar, getPropertyMethod, Expression.Constant("_variant", typeof<string>)),
+                toStringMethod)
+        let variantTagVar = Expression.Variable(typeof<string>, "variantTag")
+        let assignTag = Expression.Assign(variantTagVar, variantTagExpr) :> Expression
+
+        let rec buildCases (remaining: MatchCase list) : Expression =
+            match remaining with
+            | [] -> Expression.Empty() :> Expression
+            | case :: rest ->
+                // Compare variantTag == case.VariantName
+                let testExpr =
+                    Expression.Equal(
+                        variantTagVar,
+                        Expression.Constant(case.VariantName, typeof<string>)) :> Expression
+
+                // Destructure fields: look up variant's field names from ctx.UnionDefinitions
+                let unionName = ctx.VariantToUnion.[case.VariantName]
+                let variants = ctx.UnionDefinitions.[unionName]
+                let variant = variants |> List.find (fun v -> v.Name = case.VariantName)
+                let fieldNames = variant.Fields |> List.map fst
+
+                // Create binding variables and initialize from matchVar properties
+                let bindingVars = ResizeArray<ParameterExpression>()
+                let bindingInits = ResizeArray<Expression>()
+                let mutable caseCtx = ctx
+                for (bindingName, fieldName) in List.zip case.Bindings fieldNames do
+                    let bindVar = Expression.Variable(typeof<JyroValue>, bindingName)
+                    bindingVars.Add(bindVar)
+                    let getField = Expression.Call(matchVar, getPropertyMethod, Expression.Constant(fieldName, typeof<string>))
+                    bindingInits.Add(Expression.Assign(bindVar, getField) :> Expression)
+                    caseCtx <- caseCtx.WithVariable(bindingName, bindVar)
+
+                // Compile case body with bindings in scope
+                let bodyExpr = compileBlock caseCtx case.Body
+                let caseBlock =
+                    if bindingVars.Count > 0 then
+                        let allExprs = ResizeArray<Expression>()
+                        allExprs.AddRange(bindingInits)
+                        allExprs.Add(bodyExpr)
+                        Expression.Block(bindingVars, allExprs) :> Expression
+                    else
+                        bodyExpr
+
+                let elseExpr = buildCases rest
+                Expression.IfThenElse(testExpr, caseBlock, elseExpr) :> Expression
+
+        let chain = buildCases cases
+        Expression.Block(typeof<System.Void>, [| matchVar; variantTagVar |], [| assignMatch; assignTag; chain |]) :> Expression
 
     /// Compile a block of statements
     and compileBlock (ctx: CompilationContext) (stmts: Stmt list) : Expression =
@@ -380,7 +445,18 @@ module StatementCompiler =
                 (withStatementCheck ctx expr, ctx')
             | Switch(expr, cases, defaultCase, _) ->
                 (withStatementCheck ctx (compileSwitch ctx expr cases defaultCase), ctx)
-            | Return(messageOpt, _) ->
+            | Return(valueOpt, _) ->
+                // Return from a function - returns the expression value (or null if bare return)
+                let returnValue =
+                    match valueOpt with
+                    | Some expr -> compileExpr ctx expr
+                    | None -> Expression.Constant(JyroNull.Instance, typeof<JyroValue>) :> Expression
+                match ctx.ReturnLabel with
+                | Some label ->
+                    (withStatementCheck ctx (Expression.Return(label, returnValue) :> Expression), ctx)
+                | None -> failwith "Return without return label"
+            | Exit(messageOpt, _) ->
+                // Exit - clean script termination
                 let setMessageExpr =
                     match messageOpt with
                     | Some expr ->
@@ -388,20 +464,50 @@ module StatementCompiler =
                         let msgStr = Expression.Call(compiled, typeof<JyroValue>.GetMethod("ToStringValue")) :> Expression
                         Some (Expression.Call(ctx.ContextParam, setReturnMessageMethod, msgStr) :> Expression)
                     | None -> None
-                match ctx.ReturnLabel with
-                | Some label ->
-                    let returnExpr = Expression.Return(label, ctx.DataParam :> Expression) :> Expression
+                if ctx.InFunction then
+                    // Inside a function, exit must escape the entire call stack.
+                    // Throw a JyroRuntimeException with ScriptReturn code - execute() handles this as success.
+                    let messageExpr =
+                        match messageOpt with
+                        | Some expr ->
+                            let compiled = compileExpr ctx expr
+                            Expression.Call(compiled, typeof<JyroValue>.GetMethod("ToStringValue")) :> Expression
+                        | None ->
+                            Expression.Constant("", typeof<string>) :> Expression
+                    let rteNew = Expression.New(
+                        typeof<JyroRuntimeException>.GetConstructor([| typeof<MessageCode>; typeof<string> |]),
+                        Expression.Constant(MessageCode.ScriptReturn, typeof<MessageCode>),
+                        messageExpr)
+                    let throwExpr = Expression.Throw(rteNew, typeof<System.Void>) :> Expression
                     let block =
                         match setMessageExpr with
-                        | Some setMsg -> Expression.Block(setMsg, returnExpr) :> Expression
-                        | None -> returnExpr
+                        | Some setMsg -> Expression.Block(setMsg, throwExpr) :> Expression
+                        | None -> throwExpr
                     (withStatementCheck ctx block, ctx)
-                | None ->
-                    let block =
-                        match setMessageExpr with
-                        | Some setMsg -> Expression.Block(setMsg, ctx.DataParam :> Expression) :> Expression
-                        | None -> ctx.DataParam :> Expression
-                    (withStatementCheck ctx block, ctx)
+                else
+                    // At top level, jump to the script return label
+                    match ctx.ReturnLabel with
+                    | Some label ->
+                        let returnExpr = Expression.Return(label, ctx.DataParam :> Expression) :> Expression
+                        let block =
+                            match setMessageExpr with
+                            | Some setMsg -> Expression.Block(setMsg, returnExpr) :> Expression
+                            | None -> returnExpr
+                        (withStatementCheck ctx block, ctx)
+                    | None ->
+                        let block =
+                            match setMessageExpr with
+                            | Some setMsg -> Expression.Block(setMsg, ctx.DataParam :> Expression) :> Expression
+                            | None -> ctx.DataParam :> Expression
+                        (withStatementCheck ctx block, ctx)
+            | FuncDef _ ->
+                // No-op at script level - function bodies are compiled separately
+                (Expression.Empty() :> Expression, ctx)
+            | UnionDef _ ->
+                // No-op at script level - union definitions are processed by the linker
+                (Expression.Empty() :> Expression, ctx)
+            | Match(expr, cases, _) ->
+                (withStatementCheck ctx (compileMatch ctx expr cases), ctx)
             | Fail(messageOpt, _) ->
                 let messageExpr =
                     match messageOpt with

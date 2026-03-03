@@ -1,0 +1,17 @@
+# Test function composition - functions calling functions
+
+func Add(a: number, b: number)
+    return a + b
+end
+
+func Multiply(a: number, b: number)
+    return a * b
+end
+
+func Calculate(x: number, y: number)
+    var sum = Add(x, y)
+    var product = Multiply(x, y)
+    return Add(sum, product)
+end
+
+Data.result = Calculate(3, 4)

@@ -1,0 +1,10 @@
+# Test that nested function declarations are a compile error
+
+func Outer()
+    func Inner()
+        return 1
+    end
+    return Inner()
+end
+
+Data.result = Outer()

@@ -1,0 +1,10 @@
+# Test recursive function (factorial)
+
+func Factorial(n: number)
+    if n <= 1 then
+        return 1
+    end
+    return n * Factorial(n - 1)
+end
+
+Data.result = Factorial(5)

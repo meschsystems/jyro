@@ -1,0 +1,17 @@
+# Test match expression in direct variable assignment
+
+union Color
+    Red()
+    Green()
+    Blue()
+end
+
+var c = Green()
+
+var label = match c do
+    case Red() then "red"
+    case Green() then "green"
+    case Blue() then "blue"
+end
+
+Data.label = label

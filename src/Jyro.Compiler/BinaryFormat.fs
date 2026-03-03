@@ -21,7 +21,7 @@ type DeserializedProgram =
 /// Encodes the validated AST and function dependency table into a compact binary representation.
 module BinaryFormat =
     let [<Literal>] private MagicBytes = "JYRX"
-    let [<Literal>] private FormatVersion = 2us
+    let [<Literal>] private FormatVersion = 5us
     let [<Literal>] private HeaderSize = 44
 
     // --- Writer helpers ---
@@ -183,10 +183,34 @@ module BinaryFormat =
             w.Write(if isIncrement then 1uy else 0uy)
             w.Write(if isPrefix then 1uy else 0uy)
             writePosition w pos
+        | MatchExpr(expr, cases, pos) ->
+            w.Write(0x0Euy)
+            writeExpr w expr
+            writeList w writeMatchExprCase cases
+            writePosition w pos
+
+    and private writeMatchExprCase (w: BinaryWriter) (case: MatchExprCase) =
+        writeString w case.VariantName
+        writeList w writeString case.Bindings
+        writeExpr w case.Body
+        writePosition w case.Pos
 
     and private writeSwitchCase (w: BinaryWriter) (case: SwitchCase) =
         writeList w writeExpr case.Values
         writeList w writeStmt case.Body
+
+    and private writeUnionVariant (w: BinaryWriter) (variant: UnionVariant) =
+        writeString w variant.Name
+        w.Write(uint16 variant.Fields.Length)
+        variant.Fields |> List.iter (fun (name, typeHint) ->
+            writeString w name
+            writeOption w writeJyroType typeHint)
+
+    and private writeMatchCase (w: BinaryWriter) (case: MatchCase) =
+        writeString w case.VariantName
+        writeList w writeString case.Bindings
+        writeList w writeStmt case.Body
+        writePosition w case.Pos
 
     and private writeStmt (w: BinaryWriter) (stmt: Stmt) =
         match stmt with
@@ -255,6 +279,29 @@ module BinaryFormat =
         | ExprStmt(expr, pos) ->
             w.Write(0x2Buy)
             writeExpr w expr
+            writePosition w pos
+        | FuncDef(name, parameters, body, pos) ->
+            w.Write(0x2Cuy)
+            writeString w name
+            w.Write(uint16 parameters.Length)
+            parameters |> List.iter (fun (pName, typeHint) ->
+                writeString w pName
+                writeOption w writeJyroType typeHint)
+            writeList w writeStmt body
+            writePosition w pos
+        | Exit(value, pos) ->
+            w.Write(0x2Duy)
+            writeOption w writeExpr value
+            writePosition w pos
+        | UnionDef(name, variants, pos) ->
+            w.Write(0x2Euy)
+            writeString w name
+            writeList w writeUnionVariant variants
+            writePosition w pos
+        | Match(expr, cases, pos) ->
+            w.Write(0x2Fuy)
+            writeExpr w expr
+            writeList w writeMatchCase cases
             writePosition w pos
 
     // --- Reader helpers ---
@@ -420,6 +467,11 @@ module BinaryFormat =
                 let isPrefix = r.ReadByte() <> 0uy
                 let pos = readPosition r
                 IncrementDecrement(expr, isIncrement, isPrefix, pos)
+            | 0x0Euy ->
+                let expr = readExpr r
+                let cases = readList r readMatchExprCase
+                let pos = readPosition r
+                MatchExpr(expr, cases, pos)
             | tag -> failwithf "Unknown Expr tag: 0x%02X" tag
         finally
             deserializeDepth <- deserializeDepth - 1
@@ -428,6 +480,28 @@ module BinaryFormat =
         let values = readList r readExpr
         let body = readList r readStmt
         { Values = values; Body = body }
+
+    and private readUnionVariant (r: BinaryReader) : UnionVariant =
+        let name = readString r
+        let fieldCount = int (r.ReadUInt16())
+        if fieldCount > MaxListCount then
+            failwithf "Field count %d exceeds maximum of %d" fieldCount MaxListCount
+        let fields = [ for _ in 1 .. fieldCount -> (readString r, readOption r readJyroType) ]
+        { Name = name; Fields = fields }
+
+    and private readMatchCase (r: BinaryReader) : MatchCase =
+        let variantName = readString r
+        let bindings = readList r readString
+        let body = readList r readStmt
+        let pos = readPosition r
+        { VariantName = variantName; Bindings = bindings; Body = body; Pos = pos }
+
+    and private readMatchExprCase (r: BinaryReader) : MatchExprCase =
+        let variantName = readString r
+        let bindings = readList r readString
+        let body = readExpr r
+        let pos = readPosition r
+        { VariantName = variantName; Bindings = bindings; Body = body; Pos = pos }
 
     and private readStmt (r: BinaryReader) : Stmt =
         deserializeDepth <- deserializeDepth + 1
@@ -501,6 +575,29 @@ module BinaryFormat =
                 let expr = readExpr r
                 let pos = readPosition r
                 ExprStmt(expr, pos)
+            | 0x2Cuy ->
+                let name = readString r
+                let paramCount = int (r.ReadUInt16())
+                if paramCount > MaxListCount then
+                    failwithf "Parameter count %d exceeds maximum of %d" paramCount MaxListCount
+                let parameters = [ for _ in 1 .. paramCount -> (readString r, readOption r readJyroType) ]
+                let body = readList r readStmt
+                let pos = readPosition r
+                FuncDef(name, parameters, body, pos)
+            | 0x2Duy ->
+                let value = readOption r readExpr
+                let pos = readPosition r
+                Exit(value, pos)
+            | 0x2Euy ->
+                let name = readString r
+                let variants = readList r readUnionVariant
+                let pos = readPosition r
+                UnionDef(name, variants, pos)
+            | 0x2Fuy ->
+                let expr = readExpr r
+                let cases = readList r readMatchCase
+                let pos = readPosition r
+                Match(expr, cases, pos)
             | tag -> failwithf "Unknown Stmt tag: 0x%02X" tag
         finally
             deserializeDepth <- deserializeDepth - 1

@@ -1,11 +1,11 @@
-# Test return inside a loop exits script
+# Test exit inside a loop exits script
 
 var sum = 0
 foreach n in [1, 2, 3, 4, 5] do
     sum += n
     if sum > 6 then
         Data.earlySum = sum
-        return
+        exit
     end
 end
 Data.earlySum = -1

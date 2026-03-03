@@ -8,6 +8,8 @@
 
 	<ItemGroup>
 		<Compile Include="Validator.fs" />
+		<Compile Include="JyroUserFunction.fs" />
+		<Compile Include="JyroVariantConstructor.fs" />
 		<Compile Include="Linker.fs" />
 		<Compile Include="ExpressionCompiler.fs" />
 		<Compile Include="StatementCompiler.fs" />

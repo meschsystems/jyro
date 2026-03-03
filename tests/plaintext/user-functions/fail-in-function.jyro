@@ -1,0 +1,10 @@
+# Test that fail inside a function kills the script
+
+func Validate(x)
+    if x < 0 then
+        fail "negative value"
+    end
+    return x
+end
+
+Data.result = Validate(-1)

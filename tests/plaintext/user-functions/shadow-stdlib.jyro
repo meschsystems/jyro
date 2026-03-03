@@ -1,0 +1,7 @@
+# Test that shadowing a stdlib function is a linker error
+
+func ToUpper(s)
+    return s
+end
+
+Data.result = ToUpper("hello")

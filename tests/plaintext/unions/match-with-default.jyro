@@ -1,0 +1,18 @@
+# Test that default is not allowed in match (use switch for catch-all)
+
+union Color
+    Red()
+    Green()
+    Blue()
+end
+
+func Describe(c)
+    match c do
+        case Red() then
+            return "warm"
+        default then
+            return "cool"
+    end
+end
+
+Data.result = Describe(Red())

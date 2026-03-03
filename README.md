@@ -110,7 +110,7 @@ foreach (var msg in result.Messages)
 
 ### Structured Diagnostics
 
-For programmatic consumption, `DiagnosticFormatter.toStructured` converts a diagnostic into a `StructuredDiagnostic` record containing the code, numeric code, severity, message, args, location, and subsystem name — suitable for JSON serialization or UI rendering.
+For programmatic consumption, `DiagnosticFormatter.toStructured` converts a diagnostic into a `StructuredDiagnostic` record containing the code, numeric code, severity, message, args, location, and subsystem name - suitable for JSON serialization or UI rendering.
 
 ```csharp
 var structured = DiagnosticFormatter.toStructured(msg);

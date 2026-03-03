@@ -1,0 +1,7 @@
+# Test that union inside if/while is a validation error
+
+if true then
+    union Shape
+        Circle(radius: number)
+    end
+end

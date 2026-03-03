@@ -1,0 +1,13 @@
+# Test match expression as a function argument
+
+union Shape
+    Circle(radius: number)
+    Rect(width: number, height: number)
+end
+
+var shape = Circle(5)
+
+Data.result = ToString(match shape do
+    case Circle(r) then r * r
+    case Rect(w, h) then w * h
+end)

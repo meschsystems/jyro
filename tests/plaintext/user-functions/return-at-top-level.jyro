@@ -1,0 +1,4 @@
+# Test that return outside a function is a compile error
+
+Data.x = 1
+return

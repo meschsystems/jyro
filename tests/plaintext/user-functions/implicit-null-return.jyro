@@ -1,0 +1,7 @@
+# Test function with no return statement returns null
+
+func DoNothing()
+    var x = 1
+end
+
+Data.result = DoNothing()

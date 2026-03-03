@@ -1,0 +1,7 @@
+# Test function called via lambda in stdlib pipeline
+
+func Triple(x: number)
+    return x * 3
+end
+
+Data.result = Map([1, 2, 3], x => Triple(x))

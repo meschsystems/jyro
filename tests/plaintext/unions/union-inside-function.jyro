@@ -1,0 +1,10 @@
+# Test that union declared inside a function is a validation error
+
+func MakeStuff()
+    union Shape
+        Circle(radius: number)
+    end
+    return Circle(5)
+end
+
+Data.result = MakeStuff()

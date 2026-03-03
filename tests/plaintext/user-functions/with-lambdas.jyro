@@ -1,0 +1,8 @@
+# Test function that uses stdlib higher-order functions internally
+
+func SumPositive(items)
+    var positives = Where(items, x => x > 0)
+    return Sum(positives)
+end
+
+Data.result = SumPositive([-3, 5, -1, 8, 2])

@@ -1,0 +1,18 @@
+# Test variants with no fields
+
+union Option
+    Some(value)
+    None()
+end
+
+func GetOrDefault(opt, fallback)
+    match opt do
+        case Some(v) then
+            return v
+        case None() then
+            return fallback
+    end
+end
+
+Data.found = GetOrDefault(Some(42), 0)
+Data.missing = GetOrDefault(None(), 0)

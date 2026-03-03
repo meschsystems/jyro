@@ -214,7 +214,7 @@ type JyroValue() =
                 | _ -> raise (JyroRuntimeException(MessageCode.InvalidType,
                         sprintf "Cannot assign %A to variable '%s' of type boolean" value.ValueType variableName))
             | _ ->
-                // Array, Object, Null — no cross-type coercion
+                // Array, Object, Null - no cross-type coercion
                 raise (JyroRuntimeException(MessageCode.InvalidType,
                     sprintf "Cannot assign %A to variable '%s' of type %A" value.ValueType variableName targetType))
 

@@ -62,21 +62,21 @@ if user.profile.name then
     Data.nestedPresentGuard = "entered"
 end
 
-# Test 12: Chained null-guard — user present with profile
+# Test 12: Chained null-guard - user present with profile
 if Data.user is not null and Data.user.profile is not null then
     Data.userName = Data.user.profile.name
 else
     Data.userName = "Guest"
 end
 
-# Test 13: Chained null-guard — user missing entirely
+# Test 13: Chained null-guard - user missing entirely
 if Data.noUser is not null and Data.noUser.profile is not null then
     Data.missingUserName = Data.noUser.profile.name
 else
     Data.missingUserName = "Guest"
 end
 
-# Test 14: Chained null-guard — user present but profile missing
+# Test 14: Chained null-guard - user present but profile missing
 if Data.partial is not null and Data.partial.profile is not null then
     Data.partialName = Data.partial.profile.name
 else

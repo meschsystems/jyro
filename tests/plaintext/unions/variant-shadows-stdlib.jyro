@@ -1,0 +1,7 @@
+# Test that variant constructor shadowing stdlib is a linker error
+
+union Bad
+    ToUpper(value)
+end
+
+Data.result = ToUpper("hello")

@@ -1,0 +1,15 @@
+# Test basic union constructor, _variant tag, and field access
+
+union Shape
+    Circle(radius: number)
+    Rect(width: number, height: number)
+end
+
+var c = Circle(5)
+var r = Rect(3, 4)
+
+Data.circleTag = c._variant
+Data.circleRadius = c.radius
+Data.rectTag = r._variant
+Data.rectWidth = r.width
+Data.rectHeight = r.height

@@ -50,7 +50,8 @@ switch    do        case      default   while     for
 foreach   in        return    fail      break     continue
 and       or        not       is        true      false
 null      number    string    boolean   object    array
-to        downto    by
+to        downto    by        func      exit      union
+match
 ```
 
 ### 1.4 Literals
@@ -174,19 +175,58 @@ block = { statement } ;
 ### 2.2 Statements
 
 ```ebnf
-statement = var_decl
+statement = func_def
+          | union_def
+          | var_decl
           | if_stmt
           | while_stmt
           | for_stmt
           | foreach_stmt
           | switch_stmt
+          | match_stmt
           | return_stmt
+          | exit_stmt
           | fail_stmt
           | break_stmt
           | continue_stmt
           | assignment_stmt
           | expr_stmt ;
 ```
+
+#### Function Definition
+
+```ebnf
+func_param = identifier , [ ":" , type_keyword ] ;
+func_params = "(" , [ func_param , { "," , func_param } ] , ")" ;
+
+func_def = "func" , identifier , func_params , block , "end" ;
+```
+
+Functions must be declared at the top level (not nested inside control flow or other functions). Functions are pure - they cannot access `Data` and have no closures. All dependencies must be passed as parameters.
+
+#### Union Declaration
+
+```ebnf
+variant_fields = "(" , [ func_param , { "," , func_param } ] , ")" ;
+variant = identifier , [ variant_fields ] ;
+
+union_def = "union" , identifier , variant , { variant } , "end" ;
+```
+
+Unions must be declared at the top level (not nested inside control flow or functions). Each variant acts as a constructor function that creates a tagged object with a `_variant` discriminator field. Variant names must be unique across all unions.
+
+#### Match Statement
+
+```ebnf
+match_bindings = "(" , [ identifier , { "," , identifier } ] , ")" ;
+match_case = "case" , identifier , [ match_bindings ] , "then" , block ;
+
+match_stmt = "match" , expression , "do" ,
+             match_case , { match_case } ,
+             "end" ;
+```
+
+Match destructures a tagged union value by its `_variant` tag. Each case binds the variant's fields to local variables. The match must be exhaustive - all variants of the union must be covered. For open-ended dispatch with a catch-all, use `switch` with `default` instead.
 
 #### Variable Declaration
 
@@ -255,7 +295,13 @@ switch_stmt = "switch" , expression , "do" ,
 #### Return Statement
 
 ```ebnf
-return_stmt = "return" , [ expression ] ;  (* expression must begin on same line *)
+return_stmt = "return" , [ expression ] ;  (* expression must begin on same line; only valid inside func *)
+```
+
+#### Exit Statement
+
+```ebnf
+exit_stmt = "exit" , [ expression ] ;  (* expression must begin on same line; clean script termination *)
 ```
 
 #### Fail Statement
@@ -383,6 +429,7 @@ primary_expr = lambda_expr
              | string_literal
              | array_literal
              | object_literal
+             | match_expr
              | grouped_expr
              | identifier ;
 ```
@@ -405,6 +452,18 @@ lambda_params = "(" , [ identifier , { "," , identifier } ] , ")"
 
 lambda_expr = lambda_params , "=>" , expression ;
 ```
+
+#### Match Expression
+
+```ebnf
+match_expr_case = "case" , identifier , [ match_bindings ] , "then" , expression ;
+
+match_expr = "match" , expression , "do" ,
+             match_expr_case , { match_expr_case } ,
+             "end" ;
+```
+
+Match expressions produce a value. Each case arm is a single expression (not a block). Like statement match, the match expression must be exhaustive - all variants of the union must be covered.
 
 #### Grouped Expression
 

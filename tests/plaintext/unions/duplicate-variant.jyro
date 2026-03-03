@@ -1,0 +1,11 @@
+# Test that duplicate variant names across unions is a validation error
+
+union Shape
+    Circle(radius: number)
+end
+
+union Other
+    Circle(size: number)
+end
+
+Data.result = Circle(1)

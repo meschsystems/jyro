@@ -1,0 +1,18 @@
+# Test match with destructuring inside a function
+
+union Shape
+    Circle(radius: number)
+    Rect(width: number, height: number)
+end
+
+func Area(shape)
+    match shape do
+        case Circle(r) then
+            return 3.14159 * r * r
+        case Rect(w, h) then
+            return w * h
+    end
+end
+
+Data.circleArea = Area(Circle(10))
+Data.rectArea = Area(Rect(3, 4))

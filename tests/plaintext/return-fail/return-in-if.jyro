@@ -1,11 +1,11 @@
-# Test return inside conditional (guard clause pattern)
+# Test exit inside conditional (guard clause pattern)
 
 # When condition is NOT met, code after runs
 Data.status = "processing"
 var valid = true
 if not valid then
     Data.status = "invalid"
-    return
+    exit
 end
 Data.status = "complete"
 Data.result = 42

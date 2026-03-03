@@ -6,11 +6,13 @@ module Linker =
     /// Linking context
     type LinkContext =
         { Functions: Map<string, IJyroFunction>
+          HostFunctions: Set<string>
           ReferencedFunctions: Set<string>
           Messages: DiagnosticMessage list }
 
         static member Empty =
             { Functions = Map.empty
+              HostFunctions = Set.empty
               ReferencedFunctions = Set.empty
               Messages = [] }
 
@@ -67,6 +69,9 @@ module Linker =
             ctx |> linkExpr <| e
         | IncrementDecrement(e, _, _, _) ->
             ctx |> linkExpr <| e
+        | MatchExpr(expr, cases, _) ->
+            let ctx' = linkExpr ctx expr
+            cases |> List.fold (fun c (mc: MatchExprCase) -> linkExpr c mc.Body) ctx'
         | _ -> ctx
 
     /// Check function calls in a statement
@@ -110,10 +115,21 @@ module Linker =
             match valueOpt with
             | Some expr -> linkExpr ctx expr
             | None -> ctx
+        | Exit(valueOpt, _) ->
+            match valueOpt with
+            | Some expr -> linkExpr ctx expr
+            | None -> ctx
         | Fail(msgOpt, _) ->
             match msgOpt with
             | Some expr -> linkExpr ctx expr
             | None -> ctx
+        | FuncDef(_, _, body, _) ->
+            // Traverse function body to resolve function calls within it
+            body |> List.fold linkStmt ctx
+        | UnionDef _ -> ctx
+        | Match(expr, cases, _) ->
+            let ctx' = linkExpr ctx expr
+            cases |> List.fold (fun c mc -> mc.Body |> List.fold linkStmt c) ctx'
         | Break _ | Continue _ -> ctx
         | ExprStmt(expr, _) ->
             linkExpr ctx expr
@@ -121,20 +137,91 @@ module Linker =
     /// Linked program ready for execution
     type LinkedProgram =
         { Program: Program
-          Functions: Map<string, IJyroFunction> }
+          Functions: Map<string, IJyroFunction>
+          UserFunctions: Map<string, JyroUserFunction>
+          VariantConstructors: Map<string, JyroVariantConstructor> }
 
     /// Link a program with the available functions
     let link (program: Program) (functions: IJyroFunction seq) : JyroResult<LinkedProgram> =
-        let ctx = functions |> Seq.fold (fun (c: LinkContext) (f: IJyroFunction) -> c.AddFunction(f)) LinkContext.Empty
-        let ctx' = program.Statements |> List.fold linkStmt ctx
-        let messages = ctx'.Messages |> List.rev
+        // Build initial context with host/stdlib functions
+        let hostFunctionNames = functions |> Seq.map (fun f -> f.Name) |> Set.ofSeq
+        let ctx =
+            functions
+            |> Seq.fold (fun (c: LinkContext) (f: IJyroFunction) -> c.AddFunction(f))
+                { LinkContext.Empty with HostFunctions = hostFunctionNames }
+
+        // First pass: extract FuncDef and UnionDef statements, create shells/constructors, check for shadowing
+        let userFunctions = System.Collections.Generic.Dictionary<string, JyroUserFunction>()
+        let variantConstructors = System.Collections.Generic.Dictionary<string, JyroVariantConstructor>()
+        let ctx' =
+            program.Statements |> List.fold (fun (c: LinkContext) stmt ->
+                match stmt with
+                | FuncDef(name, parameters, _, pos) ->
+                    let loc = SourceLocation.Create(pos.Line, pos.Column)
+                    // Check for shadowing of host/stdlib functions
+                    if c.HostFunctions.Contains(name) then
+                        c.AddError(MessageCode.FunctionOverride,
+                            sprintf "Function '%s' overrides a built-in function" name,
+                            [| box name |], loc)
+                    // Check for duplicate user functions
+                    elif userFunctions.ContainsKey(name) then
+                        c.AddError(MessageCode.DuplicateFunction,
+                            sprintf "Function '%s' is already defined" name,
+                            [| box name |], loc)
+                    // Check for conflict with variant constructors
+                    elif variantConstructors.ContainsKey(name) then
+                        c.AddError(MessageCode.FunctionShadowsVariant,
+                            sprintf "Function '%s' shadows variant constructor '%s'" name name,
+                            [| box name |], loc)
+                    else
+                        let shell = JyroUserFunction.createShell name parameters
+                        userFunctions.[name] <- shell
+                        c.AddFunction(shell)
+                | UnionDef(unionName, variants, pos) ->
+                    let loc = SourceLocation.Create(pos.Line, pos.Column)
+                    variants |> List.fold (fun (c': LinkContext) variant ->
+                        if c'.HostFunctions.Contains(variant.Name) then
+                            c'.AddError(MessageCode.VariantShadowsFunction,
+                                sprintf "Variant constructor '%s' shadows built-in function '%s'" variant.Name variant.Name,
+                                [| box variant.Name |], loc)
+                        elif userFunctions.ContainsKey(variant.Name) then
+                            c'.AddError(MessageCode.FunctionShadowsVariant,
+                                sprintf "Function '%s' shadows variant constructor '%s'" variant.Name variant.Name,
+                                [| box variant.Name |], loc)
+                        elif variantConstructors.ContainsKey(variant.Name) then
+                            c'.AddError(MessageCode.DuplicateFunction,
+                                sprintf "Variant constructor '%s' is already defined" variant.Name,
+                                [| box variant.Name |], loc)
+                        else
+                            let ctor = JyroVariantConstructor.create unionName variant
+                            variantConstructors.[variant.Name] <- ctor
+                            c'.AddFunction(ctor)
+                    ) c
+                | _ -> c
+            ) ctx
+
+        // Second pass: traverse all statements (including function bodies) to resolve calls
+        let ctx'' = program.Statements |> List.fold linkStmt ctx'
+        let messages = ctx''.Messages |> List.rev
         if messages |> List.exists (fun m -> m.Severity = MessageSeverity.Error) then
             JyroResult<LinkedProgram>.Failure(messages)
         else
             let referencedFunctionMap =
-                ctx'.ReferencedFunctions
+                ctx''.ReferencedFunctions
                 |> Set.toSeq
-                |> Seq.choose (fun name -> ctx'.Functions.TryFind(name) |> Option.map (fun f -> name, f))
+                |> Seq.choose (fun name -> ctx''.Functions.TryFind(name) |> Option.map (fun f -> name, f))
                 |> Map.ofSeq
-            let linkedProgram = { Program = program; Functions = referencedFunctionMap }
+            let userFuncMap =
+                userFunctions
+                |> Seq.map (fun kvp -> kvp.Key, kvp.Value)
+                |> Map.ofSeq
+            let variantCtorMap =
+                variantConstructors
+                |> Seq.map (fun kvp -> kvp.Key, kvp.Value)
+                |> Map.ofSeq
+            let linkedProgram =
+                { Program = program
+                  Functions = referencedFunctionMap
+                  UserFunctions = userFuncMap
+                  VariantConstructors = variantCtorMap }
             { Value = Some linkedProgram; Messages = messages; IsSuccess = true }

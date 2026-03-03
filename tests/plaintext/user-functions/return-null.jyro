@@ -1,0 +1,7 @@
+# Test bare return returns null
+
+func GetNothing()
+    return
+end
+
+Data.result = GetNothing()

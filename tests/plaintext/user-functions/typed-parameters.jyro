@@ -1,0 +1,7 @@
+# Test typed parameter hints with coercion
+
+func Add(a: number, b: number)
+    return a + b
+end
+
+Data.result = Add(10, 20)

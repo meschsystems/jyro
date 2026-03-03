@@ -26,6 +26,11 @@ type JyroType =
     | ArrayType
     | NullType
 
+/// A variant in a union declaration
+type UnionVariant =
+    { Name: string
+      Fields: (string * JyroType option) list }
+
 /// Expression AST nodes
 type Expr =
     /// A literal value (number, string, boolean, null)
@@ -54,6 +59,8 @@ type Expr =
     | TypeCheck of expr: Expr * typeName: JyroType * isNegated: bool * pos: Position
     /// Pre/post increment/decrement (e.g., ++x, x--)
     | IncrementDecrement of expr: Expr * isIncrement: bool * isPrefix: bool * pos: Position
+    /// Match expression (each arm is a single expression that produces a value)
+    | MatchExpr of expr: Expr * cases: MatchExprCase list * pos: Position
 
     /// Get the position of this expression
     member this.Position =
@@ -71,6 +78,14 @@ type Expr =
         | Lambda(_, _, pos) -> pos
         | TypeCheck(_, _, _, pos) -> pos
         | IncrementDecrement(_, _, _, pos) -> pos
+        | MatchExpr(_, _, pos) -> pos
+
+/// A case in a match expression (body is a single expression)
+and MatchExprCase =
+    { VariantName: string
+      Bindings: string list
+      Body: Expr
+      Pos: Position }
 
 /// Direction for range-based for loops
 type ForDirection =
@@ -93,16 +108,24 @@ type Stmt =
     | For of varName: string * startExpr: Expr * endExpr: Expr * stepExpr: Expr option * direction: ForDirection * body: Stmt list * pos: Position
     /// Switch statement
     | Switch of expr: Expr * cases: SwitchCase list * defaultCase: Stmt list option * pos: Position
-    /// Return statement
+    /// Return statement (returns a value from a function)
     | Return of value: Expr option * pos: Position
     /// Fail statement (business logic failure)
     | Fail of message: Expr option * pos: Position
+    /// Exit statement (clean script termination)
+    | Exit of value: Expr option * pos: Position
+    /// Function definition
+    | FuncDef of name: string * parameters: (string * JyroType option) list * body: Stmt list * pos: Position
     /// Break statement (exits loop)
     | Break of pos: Position
     /// Continue statement (next iteration)
     | Continue of pos: Position
     /// Expression statement (expression evaluated for side effects)
     | ExprStmt of expr: Expr * pos: Position
+    /// Union type declaration (e.g., union Shape Circle(radius: number) ... end)
+    | UnionDef of name: string * variants: UnionVariant list * pos: Position
+    /// Match statement for union pattern matching
+    | Match of expr: Expr * cases: MatchCase list * pos: Position
 
     /// Get the position of this statement
     member this.Position =
@@ -116,14 +139,25 @@ type Stmt =
         | Switch(_, _, _, pos) -> pos
         | Return(_, pos) -> pos
         | Fail(_, pos) -> pos
+        | Exit(_, pos) -> pos
+        | FuncDef(_, _, _, pos) -> pos
         | Break pos -> pos
         | Continue pos -> pos
         | ExprStmt(_, pos) -> pos
+        | UnionDef(_, _, pos) -> pos
+        | Match(_, _, pos) -> pos
 
 /// A case in a switch statement
 and SwitchCase =
     { Values: Expr list
       Body: Stmt list }
+
+/// A case in a match statement
+and MatchCase =
+    { VariantName: string
+      Bindings: string list
+      Body: Stmt list
+      Pos: Position }
 
 /// A complete Jyro program
 type Program =
@@ -140,7 +174,7 @@ module Ast =
 
     /// Check if a statement is a control flow terminator
     let isTerminator = function
-        | Return _ | Fail _ | Break _ | Continue _ -> true
+        | Return _ | Fail _ | Exit _ | Break _ | Continue _ -> true
         | _ -> false
 
     /// Get all identifiers referenced in an expression
@@ -160,4 +194,10 @@ module Ast =
             bodyIds |> List.filter (fun id -> not (List.contains id params'))
         | TypeCheck(e, _, _, _) -> getIdentifiers e
         | IncrementDecrement(e, _, _, _) -> getIdentifiers e
+        | MatchExpr(e, cases, _) ->
+            let exprIds = getIdentifiers e
+            let caseIds = cases |> List.collect (fun c ->
+                let bodyIds = getIdentifiers c.Body
+                bodyIds |> List.filter (fun id -> not (List.contains id c.Bindings)))
+            exprIds @ caseIds
         | Literal _ -> []
