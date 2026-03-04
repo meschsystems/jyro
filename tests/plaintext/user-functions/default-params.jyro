@@ -1,0 +1,30 @@
+# Default parameter values in user functions
+func Greet(name, greeting = "Hello")
+    return greeting + ", " + name
+end
+
+func TypedGreet(name: string, greeting: string = "Hello", excited: boolean = false)
+    var msg = greeting + ", " + name
+    if excited then
+        msg = msg + "!"
+    end
+    return msg
+end
+
+# All args provided
+Data.full = Greet("Alice", "Hi")
+
+# Default used
+Data.defaulted = Greet("Bob")
+
+# Typed - all args
+Data.typed_full = TypedGreet("Alice", "Hey", true)
+
+# Typed - skip last optional
+Data.typed_partial = TypedGreet("Bob", "Yo")
+
+# Typed - all defaults
+Data.typed_default = TypedGreet("Charlie")
+
+# Null triggers default
+Data.null_default = Greet("Dave", null)

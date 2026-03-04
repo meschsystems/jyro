@@ -61,25 +61,49 @@ module Compiler =
             let paramInits = ResizeArray<Expression>()
             let mutable funcCtx = innerCtx
 
-            parameters |> List.iteri (fun i (pName, typeHint) ->
-                let paramVar = Expression.Variable(typeof<JyroValue>, pName)
+            let isNullProp = typeof<JyroValue>.GetProperty("IsNull")
+            let nullConst = Expression.Constant(JyroNull.Instance, typeof<JyroValue>)
+            let countProp = typeof<System.Collections.Generic.IReadOnlyCollection<JyroValue>>.GetProperty("Count")
+            let argsCount = Expression.Property(Expression.Convert(argsParam, typeof<System.Collections.Generic.IReadOnlyCollection<JyroValue>>), countProp)
+
+            parameters |> List.iteri (fun i (p: FuncParam) ->
+                let paramVar = Expression.Variable(typeof<JyroValue>, p.Name)
                 paramVars.Add(paramVar)
 
-                let getItem = Expression.Call(argsParam, itemGetter, Expression.Constant(i)) :> Expression
+                let idxConst = Expression.Constant(i)
+                let rawGetItem = Expression.Call(argsParam, itemGetter, idxConst)
+
+                // For optional params, bounds-check so callers don't need to pad to MaxArgs
+                let getItem =
+                    if p.DefaultValue.IsSome then
+                        let inBounds = Expression.LessThan(idxConst, argsCount)
+                        Expression.Condition(inBounds, rawGetItem, nullConst, typeof<JyroValue>) :> Expression
+                    else
+                        rawGetItem :> Expression
+
+                // If the parameter has a default value, substitute it when the caller passes null
+                let valueExpr =
+                    match p.DefaultValue with
+                    | Some defaultExpr ->
+                        let compiledDefault = compileExpr funcCtx defaultExpr
+                        let isNull = Expression.Property(getItem, isNullProp)
+                        Expression.Condition(isNull, compiledDefault, getItem, typeof<JyroValue>) :> Expression
+                    | None -> getItem
+
                 let initExpr =
-                    match typeHint with
+                    match p.TypeHint with
                     | Some hint when hint <> AnyType ->
                         let targetType = ExpressionCompiler.jyroTypeToValueType hint
                         Expression.Call(coerceMethod,
-                            getItem,
+                            valueExpr,
                             Expression.Constant(targetType, typeof<JyroValueType>),
-                            Expression.Constant(pName, typeof<string>)) :> Expression
-                    | _ -> getItem
+                            Expression.Constant(p.Name, typeof<string>)) :> Expression
+                    | _ -> valueExpr
 
                 paramInits.Add(Expression.Assign(paramVar, initExpr) :> Expression)
-                funcCtx <- funcCtx.WithVariable(pName, paramVar)
-                match typeHint with
-                | Some hint -> funcCtx <- funcCtx.WithVariableType(pName, hint)
+                funcCtx <- funcCtx.WithVariable(p.Name, paramVar)
+                match p.TypeHint with
+                | Some hint -> funcCtx <- funcCtx.WithVariableType(p.Name, hint)
                 | None -> ())
 
             // Compile the function body

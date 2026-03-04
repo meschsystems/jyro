@@ -1,0 +1,6 @@
+# Non-literal default value is a validation error
+var x = 5
+func Bad(a = x)
+    return a
+end
+Data.x = Bad()

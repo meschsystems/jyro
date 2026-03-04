@@ -29,22 +29,58 @@ module Linker =
     /// Check function calls in an expression
     let rec private linkExpr (ctx: LinkContext) (expr: Expr) : LinkContext =
         match expr with
-        | Call(name, args, pos) ->
-            let ctx' = args |> List.fold linkExpr ctx
+        | Call(name, callArgs, pos) ->
+            let ctx' =
+                match callArgs with
+                | PositionalArgs exprs -> exprs |> List.fold linkExpr ctx
+                | NamedArgs pairs -> pairs |> List.fold (fun c (_, expr) -> linkExpr c expr) ctx
             match ctx'.Functions.TryFind(name) with
             | Some func ->
-                if not (func.Signature.ValidateArgCount(args.Length)) then
-                    let loc = SourceLocation.Create(pos.Line, pos.Column)
-                    if args.Length < func.Signature.MinArgs then
-                        let msg = sprintf "Function '%s' requires at least %d arguments, but %d were provided" name func.Signature.MinArgs args.Length
-                        let msgArgs = [| box name; box func.Signature.MinArgs; box args.Length |]
-                        ctx'.AddError(MessageCode.TooFewArguments, msg, msgArgs, loc)
+                match callArgs with
+                | PositionalArgs exprs ->
+                    if not (func.Signature.ValidateArgCount(exprs.Length)) then
+                        let loc = SourceLocation.Create(pos.Line, pos.Column)
+                        if exprs.Length < func.Signature.MinArgs then
+                            let msg = sprintf "Function '%s' requires at least %d arguments, but %d were provided" name func.Signature.MinArgs exprs.Length
+                            let msgArgs = [| box name; box func.Signature.MinArgs; box exprs.Length |]
+                            ctx'.AddError(MessageCode.TooFewArguments, msg, msgArgs, loc)
+                        else
+                            let msg = sprintf "Function '%s' accepts at most %d arguments, but %d were provided" name func.Signature.MaxArgs exprs.Length
+                            let msgArgs = [| box name; box func.Signature.MaxArgs; box exprs.Length |]
+                            ctx'.AddError(MessageCode.TooManyArguments, msg, msgArgs, loc)
                     else
-                        let msg = sprintf "Function '%s' accepts at most %d arguments, but %d were provided" name func.Signature.MaxArgs args.Length
-                        let msgArgs = [| box name; box func.Signature.MaxArgs; box args.Length |]
-                        ctx'.AddError(MessageCode.TooManyArguments, msg, msgArgs, loc)
-                else
-                    ctx'.MarkReferenced(name)
+                        ctx'.MarkReferenced(name)
+                | NamedArgs pairs ->
+                    let loc = SourceLocation.Create(pos.Line, pos.Column)
+                    let paramNames = func.Signature.Parameters |> List.map (fun p -> p.Name) |> Set.ofList
+                    let requiredParams = func.Signature.Parameters |> List.filter (fun p -> not p.IsOptional) |> List.map (fun p -> p.Name) |> Set.ofList
+                    let providedNames = pairs |> List.map fst
+                    let providedSet = providedNames |> Set.ofList
+                    // Check for duplicate named args
+                    let ctx'' =
+                        providedNames
+                        |> List.groupBy id
+                        |> List.filter (fun (_, group) -> group.Length > 1)
+                        |> List.fold (fun (c: LinkContext) (dupName, _) ->
+                            let msg = sprintf "Duplicate named argument '%s' in call to '%s'" dupName name
+                            c.AddError(MessageCode.DuplicateNamedArgument, msg, [| box dupName; box name |], loc)
+                        ) ctx'
+                    // Check for unknown parameter names
+                    let ctx'' =
+                        Set.difference providedSet paramNames
+                        |> Set.fold (fun (c: LinkContext) unknownName ->
+                            let available = func.Signature.Parameters |> List.map (fun p -> p.Name) |> String.concat ", "
+                            let msg = sprintf "Unknown parameter '%s' in call to '%s'. Available parameters: %s" unknownName name available
+                            c.AddError(MessageCode.UnknownNamedArgument, msg, [| box unknownName; box name; box available |], loc)
+                        ) ctx''
+                    // Check for missing required parameters
+                    let ctx'' =
+                        Set.difference requiredParams providedSet
+                        |> Set.fold (fun (c: LinkContext) missingName ->
+                            let msg = sprintf "Required parameter '%s' not provided in call to '%s'" missingName name
+                            c.AddError(MessageCode.MissingRequiredNamedArgument, msg, [| box missingName; box name |], loc)
+                        ) ctx''
+                    ctx''.MarkReferenced(name)
             | None ->
                 let loc = SourceLocation.Create(pos.Line, pos.Column)
                 let msg = sprintf "Undefined function '%s'" name

@@ -128,10 +128,34 @@ module ExpressionCompiler =
         Expression.Condition(testExpr, thenCompiled, elseCompiled) :> Expression
 
     /// Compile a function call with call depth tracking
-    and private compileCall (ctx: CompilationContext) (name: string) (args: Expr list) : Expression =
+    and private compileCall (ctx: CompilationContext) (name: string) (callArgs: CallArgs) : Expression =
         match ctx.Functions.TryFind(name) with
         | Some func ->
-            let compiledArgs = args |> List.map (compileExpr ctx) |> Array.ofList
+            let compiledArgs =
+                match callArgs with
+                | PositionalArgs exprs ->
+                    exprs |> List.map (compileExpr ctx) |> Array.ofList
+                | NamedArgs pairs ->
+                    // Reorder named args into parameter-declaration order, trim trailing omitted
+                    let argMap = pairs |> Map.ofList
+                    let reordered =
+                        func.Signature.Parameters
+                        |> List.map (fun param ->
+                            match argMap.TryFind(param.Name) with
+                            | Some expr -> Some (compileExpr ctx expr)
+                            | None -> None)
+                    // Find last provided arg index; trim trailing omitted so args.Count is correct
+                    let lastIdx =
+                        reordered
+                        |> List.mapi (fun i opt -> (i, opt))
+                        |> List.filter (fun (_, opt) -> opt.IsSome)
+                        |> List.tryLast
+                        |> Option.map fst
+                        |> Option.defaultValue -1
+                    reordered
+                    |> List.take (lastIdx + 1)
+                    |> List.map (Option.defaultValue (Expression.Constant(JyroNull.Instance, typeof<JyroValue>) :> Expression))
+                    |> Array.ofList
             let argsArray = Expression.NewArrayInit(typeof<JyroValue>, compiledArgs)
             let funcConst = Expression.Constant(func, typeof<IJyroFunction>)
             let executeMethod = typeof<IJyroFunction>.GetMethod("Execute")
@@ -410,7 +434,7 @@ module ExpressionCompiler =
         | Binary(left, op, right, _) -> compileBinary ctx left op right
         | Unary(op, operand, _) -> compileUnary ctx op operand
         | Ternary(cond, thenExpr, elseExpr, _) -> compileTernary ctx cond thenExpr elseExpr
-        | Call(name, args, _) -> compileCall ctx name args
+        | Call(name, callArgs, _) -> compileCall ctx name callArgs
         | PropertyAccess(target, prop, _) -> compilePropertyAccess ctx target prop
         | IndexAccess(target, index, _) -> compileIndexAccess ctx target index
         | ObjectLiteral(props, _) -> compileObjectLiteral ctx props

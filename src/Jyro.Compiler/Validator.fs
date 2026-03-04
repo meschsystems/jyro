@@ -71,7 +71,9 @@ module Validator =
         | Ternary(cond, thenExpr, elseExpr, _) ->
             ctx |> validateExpr <| cond |> validateExpr <| thenExpr |> validateExpr <| elseExpr
         | Call(_, args, _) ->
-            args |> List.fold validateExpr ctx
+            match args with
+            | PositionalArgs exprs -> exprs |> List.fold validateExpr ctx
+            | NamedArgs pairs -> pairs |> List.fold (fun c (_, expr) -> validateExpr c expr) ctx
         | PropertyAccess(target, _, _) ->
             ctx |> validateExpr <| target
         | IndexAccess(target, index, _) ->
@@ -239,20 +241,43 @@ module Validator =
                 else ctx'
             // Check for duplicate parameter names
             let ctx' =
-                parameters |> List.fold (fun (c: ValidationContext, seen: Set<string>) (pName, _) ->
-                    if seen.Contains(pName) then
+                parameters |> List.fold (fun (c: ValidationContext, seen: Set<string>) (p: FuncParam) ->
+                    if seen.Contains(p.Name) then
                         let c' = c.AddError(MessageCode.DuplicateParameterName,
-                            sprintf "Duplicate parameter '%s' in function '%s'" pName name,
-                            [| box pName; box name |], loc)
+                            sprintf "Duplicate parameter '%s' in function '%s'" p.Name name,
+                            [| box p.Name; box name |], loc)
                         (c', seen)
-                    elif pName = "Data" then
+                    elif p.Name = "Data" then
                         let c' = c.AddError(MessageCode.ReservedParameterName,
-                            sprintf "Cannot use reserved name '%s' as a parameter in function '%s'" pName name,
-                            [| box pName; box name |], loc)
-                        (c', seen.Add(pName))
+                            sprintf "Cannot use reserved name '%s' as a parameter in function '%s'" p.Name name,
+                            [| box p.Name; box name |], loc)
+                        (c', seen.Add(p.Name))
                     else
-                        (c, seen.Add(pName))
+                        (c, seen.Add(p.Name))
                 ) (ctx', Set.empty) |> fst
+            // Check that required params come before optional params
+            let ctx' =
+                parameters |> List.fold (fun (c: ValidationContext, lastOptional: string option) (p: FuncParam) ->
+                    match p.DefaultValue, lastOptional with
+                    | None, Some optName ->
+                        let c' = c.AddError(MessageCode.RequiredParamAfterOptional,
+                            sprintf "Required parameter '%s' cannot follow optional parameter '%s' in function '%s'" p.Name optName name,
+                            [| box p.Name; box optName; box name |], loc)
+                        (c', lastOptional)
+                    | Some _, _ -> (c, Some p.Name)
+                    | None, None -> (c, None)
+                ) (ctx', None) |> fst
+            // Check that default values are literals only
+            let ctx' =
+                parameters |> List.fold (fun (c: ValidationContext) (p: FuncParam) ->
+                    match p.DefaultValue with
+                    | Some (Literal _) -> c
+                    | Some _ ->
+                        c.AddError(MessageCode.DefaultValueNotLiteral,
+                            sprintf "Default value for parameter '%s' in function '%s' must be a literal value" p.Name name,
+                            [| box p.Name; box name |], loc)
+                    | None -> c
+                ) ctx'
             // Track function name for duplicate detection across the program
             let ctx' =
                 if ctx'.DefinedFunctions.Contains(name) then
@@ -263,7 +288,7 @@ module Validator =
                     { ctx' with DefinedFunctions = ctx'.DefinedFunctions.Add(name) }
             // Validate function body in a new scope with parameters declared, InFunction = true
             let funcScope =
-                parameters |> List.fold (fun (s: Scope) (pName, _) -> s.WithVariable(pName)) (Scope.Empty)
+                parameters |> List.fold (fun (s: Scope) (p: FuncParam) -> s.WithVariable(p.Name)) (Scope.Empty)
             let funcCtx =
                 { ctx' with
                     Scope = funcScope

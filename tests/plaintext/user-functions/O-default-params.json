@@ -1,0 +1,8 @@
+{
+  "full": "Hi, Alice",
+  "defaulted": "Hello, Bob",
+  "typed_full": "Hey, Alice!",
+  "typed_partial": "Yo, Bob",
+  "typed_default": "Hello, Charlie",
+  "null_default": "Hello, Dave"
+}

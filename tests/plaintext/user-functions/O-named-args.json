@@ -1,0 +1,7 @@
+{
+  "reordered": "Hi, Alice!",
+  "name_only": "Hello, Bob",
+  "skip_middle": "Hello, Charlie!",
+  "null_default": "Hello, Dave",
+  "all_provided": "Hey, Eve"
+}

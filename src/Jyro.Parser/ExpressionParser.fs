@@ -90,13 +90,24 @@ module ExpressionParser =
 
     // Postfix expressions (calls, property access, indexing, increment/decrement)
     type private PostfixOp =
-        | CallOp of Expr list * Position
+        | CallOp of CallArgs * Position
         | DotOp of string * Position
         | IndexOp of Expr * Position
         | PostIncOp of Position
         | PostDecOp of Position
 
-    let private pCallArgs : Parser<Expr list, unit> = between lparen rparen (sepBy pExpr comma)
+    /// Parse a single named argument: identifier: expr
+    /// Uses anyIdentifier since parameter names can be keywords (e.g., "array", "number")
+    let private pNamedArg : Parser<string * Expr, unit> =
+        attempt (anyIdentifier .>> colon) .>>. pExpr
+
+    /// Parse call arguments — either all named or all positional
+    let private pCallArgs : Parser<CallArgs, unit> =
+        between lparen rparen (
+            (attempt (sepBy1 pNamedArg comma) |>> NamedArgs)
+            <|>
+            (sepBy pExpr comma |>> PositionalArgs)
+        )
 
     let private pPostfixOp : Parser<PostfixOp, unit> =
         choice [

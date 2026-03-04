@@ -21,7 +21,7 @@ type DeserializedProgram =
 /// Encodes the validated AST and function dependency table into a compact binary representation.
 module BinaryFormat =
     let [<Literal>] private MagicBytes = "JYRX"
-    let [<Literal>] private FormatVersion = 5us
+    let [<Literal>] private FormatVersion = 6us
     let [<Literal>] private HeaderSize = 44
 
     // --- Writer helpers ---
@@ -143,7 +143,16 @@ module BinaryFormat =
         | Call(name, args, pos) ->
             w.Write(0x06uy)
             writeString w name
-            writeList w writeExpr args
+            match args with
+            | PositionalArgs exprs ->
+                w.Write(0uy)
+                writeList w writeExpr exprs
+            | NamedArgs pairs ->
+                w.Write(1uy)
+                w.Write(uint16 pairs.Length)
+                for (argName, expr) in pairs do
+                    writeString w argName
+                    writeExpr w expr
             writePosition w pos
         | PropertyAccess(target, prop, pos) ->
             w.Write(0x07uy)
@@ -284,9 +293,10 @@ module BinaryFormat =
             w.Write(0x2Cuy)
             writeString w name
             w.Write(uint16 parameters.Length)
-            parameters |> List.iter (fun (pName, typeHint) ->
-                writeString w pName
-                writeOption w writeJyroType typeHint)
+            parameters |> List.iter (fun (p: FuncParam) ->
+                writeString w p.Name
+                writeOption w writeJyroType p.TypeHint
+                writeOption w writeExpr p.DefaultValue)
             writeList w writeStmt body
             writePosition w pos
         | Exit(value, pos) ->
@@ -426,7 +436,15 @@ module BinaryFormat =
                 Ternary(cond, thenExpr, elseExpr, pos)
             | 0x06uy ->
                 let name = readString r
-                let args = readList r readExpr
+                let args =
+                    match r.ReadByte() with
+                    | 0uy -> PositionalArgs(readList r readExpr)
+                    | _ ->
+                        let count = int (r.ReadUInt16())
+                        if count > MaxListCount then
+                            failwithf "Named argument count %d exceeds maximum of %d" count MaxListCount
+                        let pairs = [ for _ in 1 .. count -> (readString r, readExpr r) ]
+                        NamedArgs(pairs)
                 let pos = readPosition r
                 Call(name, args, pos)
             | 0x07uy ->
@@ -580,7 +598,11 @@ module BinaryFormat =
                 let paramCount = int (r.ReadUInt16())
                 if paramCount > MaxListCount then
                     failwithf "Parameter count %d exceeds maximum of %d" paramCount MaxListCount
-                let parameters = [ for _ in 1 .. paramCount -> (readString r, readOption r readJyroType) ]
+                let parameters =
+                    [ for _ in 1 .. paramCount ->
+                        { Name = readString r
+                          TypeHint = readOption r readJyroType
+                          DefaultValue = readOption r readExpr } ]
                 let body = readList r readStmt
                 let pos = readPosition r
                 FuncDef(name, parameters, body, pos)

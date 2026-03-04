@@ -1,0 +1,23 @@
+# Named arguments with user functions
+func Greet(name, greeting = "Hello", excited = false)
+    var msg = greeting + ", " + name
+    if excited then
+        msg = msg + "!"
+    end
+    return msg
+end
+
+# All named — reordered
+Data.reordered = Greet(excited: true, name: "Alice", greeting: "Hi")
+
+# Named with defaults — skip optional args
+Data.name_only = Greet(name: "Bob")
+
+# Named — skip middle optional arg
+Data.skip_middle = Greet(name: "Charlie", excited: true)
+
+# Null for optional triggers default
+Data.null_default = Greet(name: "Dave", greeting: null)
+
+# Named with all provided
+Data.all_provided = Greet(name: "Eve", greeting: "Hey", excited: false)

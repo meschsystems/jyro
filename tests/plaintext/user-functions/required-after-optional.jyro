@@ -1,0 +1,5 @@
+# Required parameter after optional is a validation error
+func Bad(a = 1, b)
+    return a + b
+end
+Data.x = Bad(1, 2)

@@ -53,6 +53,8 @@ type MessageCode =
     | ReservedParameterName = 3503
     | DataAccessInFunction = 3504
     | ReturnOutsideFunction = 3505
+    | RequiredParamAfterOptional = 3506
+    | DefaultValueNotLiteral = 3507
     // 36xx - Unions/Match
     | UnionNotAtTopLevel = 3600
     | DuplicateVariantName = 3601
@@ -72,6 +74,9 @@ type MessageCode =
     // 42xx - Argument validation
     | TooFewArguments = 4200
     | TooManyArguments = 4201
+    | DuplicateNamedArgument = 4202
+    | UnknownNamedArgument = 4203
+    | MissingRequiredNamedArgument = 4204
     // 43xx - Union linking
     | VariantShadowsFunction = 4300
     | FunctionShadowsVariant = 4301
@@ -258,6 +263,8 @@ module MessageTemplates =
         templates.[MessageCode.ReservedParameterName] <- "Cannot use reserved name '{0}' as a parameter in function '{1}'"
         templates.[MessageCode.DataAccessInFunction] <- "Cannot access Data inside a function. Pass it as a parameter instead."
         templates.[MessageCode.ReturnOutsideFunction] <- "'return' can only be used inside a function. Use 'exit' to terminate the script."
+        templates.[MessageCode.RequiredParamAfterOptional] <- "Required parameter '{0}' cannot follow optional parameter '{1}' in function '{2}'"
+        templates.[MessageCode.DefaultValueNotLiteral] <- "Default value for parameter '{0}' in function '{1}' must be a literal value"
         templates.[MessageCode.UnionNotAtTopLevel] <- "Union '{0}' must be declared at the top level"
         templates.[MessageCode.DuplicateVariantName] <- "Variant '{0}' is already defined in union '{1}'"
         templates.[MessageCode.MatchNotExhaustive] <- "Match on union '{0}' is not exhaustive; missing case(s): {1}"
@@ -273,6 +280,9 @@ module MessageTemplates =
         templates.[MessageCode.FunctionOverride] <- "Function '{0}' overrides a built-in function"
         templates.[MessageCode.TooFewArguments] <- "Function '{0}' requires at least {1} arguments, but {2} were provided"
         templates.[MessageCode.TooManyArguments] <- "Function '{0}' accepts at most {1} arguments, but {2} were provided"
+        templates.[MessageCode.DuplicateNamedArgument] <- "Duplicate named argument '{0}' in call to '{1}'"
+        templates.[MessageCode.UnknownNamedArgument] <- "Unknown parameter '{0}' in call to '{1}'. Available parameters: {2}"
+        templates.[MessageCode.MissingRequiredNamedArgument] <- "Required parameter '{0}' not provided in call to '{1}'"
         templates.[MessageCode.VariantShadowsFunction] <- "Variant constructor '{0}' shadows built-in function '{0}'"
         templates.[MessageCode.FunctionShadowsVariant] <- "Function '{0}' shadows variant constructor '{0}'"
 

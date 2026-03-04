@@ -1,0 +1,15 @@
+# Named arguments with stdlib functions
+
+# Reorder args — Substring(text, start, length?)
+Data.sub = Substring(start: 2, text: "Hello World")
+Data.sub_len = Substring(length: 3, start: 6, text: "Hello World")
+
+# PadLeft(text, length, padChar?) — reordered with optional
+Data.pad = PadLeft(length: 10, text: "hi", padChar: "*")
+Data.pad_default = PadLeft(text: "hi", length: 8)
+
+# Replace(source, oldValue, newValue) — fully reordered
+Data.replaced = Replace(newValue: "World", oldValue: "X", source: "Hello X")
+
+# Join(left, right) — binary function
+Data.joined = Join(right: " | ", left: ["a", "b", "c"])

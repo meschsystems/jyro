@@ -117,9 +117,11 @@ module StatementParser =
         )
         |>> fun (((expr, cases), defaultCase), pos) -> Switch(expr, cases, defaultCase, pos)
 
-    // Function definition: func Name(param1, param2: type) ... end
-    let private pFuncParam =
-        identifier .>>. opt (colon >>. typeKeyword)
+    // Function definition: func Name(param1, param2: type, param3 = default) ... end
+    let private pFuncParam : Parser<FuncParam, unit> =
+        identifier .>>. opt (colon >>. typeKeyword) .>>. opt (symbolOp "=" >>. parseExpr)
+        |>> fun ((name, typeHint), defaultValue) ->
+            { Name = name; TypeHint = typeHint; DefaultValue = defaultValue }
 
     let private pFuncParams =
         between lparen rparen (sepBy pFuncParam comma)
@@ -134,8 +136,11 @@ module StatementParser =
             FuncDef(name, parameters, body, pos)
 
     // Union declaration: union Name Variant1(field1: type, ...) Variant2(...) end
+    let private pVariantField =
+        identifier .>>. opt (colon >>. typeKeyword)
+
     let private pVariantFields =
-        between lparen rparen (sepBy pFuncParam comma)
+        between lparen rparen (sepBy pVariantField comma)
 
     let private pVariant =
         identifier .>>. (opt (attempt pVariantFields) |>> Option.defaultValue [])

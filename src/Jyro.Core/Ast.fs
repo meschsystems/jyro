@@ -44,7 +44,7 @@ type Expr =
     /// A ternary/conditional expression (e.g., a ? b : c)
     | Ternary of condition: Expr * thenExpr: Expr * elseExpr: Expr * pos: Position
     /// A function call (e.g., Func(a, b))
-    | Call of name: string * args: Expr list * pos: Position
+    | Call of name: string * args: CallArgs * pos: Position
     /// Property access using dot notation (e.g., obj.prop)
     | PropertyAccess of target: Expr * property: string * pos: Position
     /// Index access using bracket notation (e.g., arr[0])
@@ -87,6 +87,17 @@ and MatchExprCase =
       Body: Expr
       Pos: Position }
 
+/// Arguments to a function call — either all positional or all named
+and CallArgs =
+    | PositionalArgs of Expr list
+    | NamedArgs of (string * Expr) list
+
+/// A parameter in a function definition, with optional type hint and optional default value
+and FuncParam =
+    { Name: string
+      TypeHint: JyroType option
+      DefaultValue: Expr option }
+
 /// Direction for range-based for loops
 type ForDirection =
     | Ascending
@@ -115,7 +126,7 @@ type Stmt =
     /// Exit statement (clean script termination)
     | Exit of value: Expr option * pos: Position
     /// Function definition
-    | FuncDef of name: string * parameters: (string * JyroType option) list * body: Stmt list * pos: Position
+    | FuncDef of name: string * parameters: FuncParam list * body: Stmt list * pos: Position
     /// Break statement (exits loop)
     | Break of pos: Position
     /// Continue statement (next iteration)
@@ -184,7 +195,10 @@ module Ast =
         | Binary(l, _, r, _) -> getIdentifiers l @ getIdentifiers r
         | Unary(_, e, _) -> getIdentifiers e
         | Ternary(c, t, e, _) -> getIdentifiers c @ getIdentifiers t @ getIdentifiers e
-        | Call(_, args, _) -> args |> List.collect getIdentifiers
+        | Call(_, args, _) ->
+            match args with
+            | PositionalArgs exprs -> exprs |> List.collect getIdentifiers
+            | NamedArgs pairs -> pairs |> List.collect (fun (_, expr) -> getIdentifiers expr)
         | PropertyAccess(t, _, _) -> getIdentifiers t
         | IndexAccess(t, i, _) -> getIdentifiers t @ getIdentifiers i
         | ObjectLiteral(props, _) -> props |> List.collect (snd >> getIdentifiers)

@@ -35,17 +35,22 @@ module JyroUserFunction =
         | Some NullType -> NullParam
 
     /// Build a JyroFunctionSignature from a function name and parameter list
-    let buildSignature (name: string) (parameters: (string * JyroType option) list) : JyroFunctionSignature =
+    let buildSignature (name: string) (parameters: FuncParam list) : JyroFunctionSignature =
         let paramDefs =
-            parameters |> List.map (fun (pName, typeHint) ->
-                Parameter.Required(pName, paramTypeFromJyroType typeHint))
+            parameters |> List.map (fun p ->
+                let pType = paramTypeFromJyroType p.TypeHint
+                if p.DefaultValue.IsSome then
+                    Parameter.Optional(p.Name, pType)
+                else
+                    Parameter.Required(p.Name, pType))
+        let required = paramDefs |> List.filter (fun p -> not p.IsOptional) |> List.length
         { Name = name
           Parameters = paramDefs
           ReturnType = AnyParam
-          MinArgs = parameters.Length
+          MinArgs = required
           MaxArgs = parameters.Length }
 
     /// Create a JyroUserFunction shell from a FuncDef AST node's name and parameters
-    let createShell (name: string) (parameters: (string * JyroType option) list) : JyroUserFunction =
+    let createShell (name: string) (parameters: FuncParam list) : JyroUserFunction =
         let signature = buildSignature name parameters
         JyroUserFunction(name, signature)

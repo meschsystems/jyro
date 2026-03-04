@@ -1,0 +1,8 @@
+{
+  "sub": "llo World",
+  "sub_len": "Wor",
+  "pad": "********hi",
+  "pad_default": "      hi",
+  "replaced": "Hello World",
+  "joined": "a | b | c"
+}
