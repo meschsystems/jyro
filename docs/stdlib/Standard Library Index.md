@@ -79,6 +79,7 @@ Higher-order functions that accept inline lambda expressions as arguments.
 | [Mode](math/Mode.md) | Returns the most frequently occurring value | No | No |
 | [Power](math/Power.md) | Raises a number to a specified power | No | No |
 | [RandomInt](math/RandomInt.md) | Generates a cryptographically secure random integer | No | No |
+| [Round](math/Round.md) | Rounds a number to a specified precision with configurable tie-breaking | No | No |
 | [SquareRoot](math/SquareRoot.md) | Returns the square root of a number | No | No |
 | [Sum](math/Sum.md) | Returns the sum of all numeric values in an array | No | No |
 

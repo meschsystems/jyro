@@ -158,6 +158,7 @@ type MessageCode =
     | UnsupportedComparisonOperator = 5906
     | NonNegativeIntegerRequired = 5907
     | Base64DecodeError = 5908
+    | InvalidRoundingMode = 5909
 
 /// Source location information
 [<Struct>]
@@ -361,6 +362,7 @@ module MessageTemplates =
         templates.[MessageCode.UnsupportedComparisonOperator] <- "Unsupported comparison operator: '{0}'. Supported operators are: ==, !=, <, <=, >, >="
         templates.[MessageCode.NonNegativeIntegerRequired] <- "{0} requires {1}. Received: {2}"
         templates.[MessageCode.Base64DecodeError] <- "Base64Decode() requires a valid Base64-encoded string. Error: {0}"
+        templates.[MessageCode.InvalidRoundingMode] <- "Invalid rounding mode '{0}'. Valid modes: halfUp, halfEven, halfDown"
 
     /// Gets the default English template for a message code, or "{0}" if not found.
     let get (code: MessageCode) : string =

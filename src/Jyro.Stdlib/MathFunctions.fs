@@ -25,6 +25,34 @@ module MathFunctions =
             let n = this.GetNumberArgument(args, 0)
             JyroNumber(Math.Ceiling(n)) :> JyroValue
 
+    type RoundFunction() =
+        inherit JyroFunctionBase("Round",
+            FunctionSignatures.create "Round"
+                [ Parameter.Required("value", NumberParam)
+                  Parameter.Required("decimals", NumberParam)
+                  Parameter.Optional("mode", StringParam) ]
+                NumberParam)
+        override this.ExecuteImpl(args, _) =
+            let value = this.GetNumberArgument(args, 0)
+            let decimalsArg = this.GetArgument<JyroNumber>(args, 1)
+            if not decimalsArg.IsInteger then
+                JyroError.raiseRuntime MessageCode.IntegerRequired [| box "Round()"; box "decimals"; box decimalsArg.Value |]
+            let decimals = decimalsArg.ToInteger()
+            let midpoint =
+                if args.Count > 2 then
+                    match this.GetStringArgument(args, 2) with
+                    | "halfUp" -> MidpointRounding.AwayFromZero
+                    | "halfEven" -> MidpointRounding.ToEven
+                    | "halfDown" -> MidpointRounding.ToZero
+                    | mode -> JyroError.raiseRuntime MessageCode.InvalidRoundingMode [| box mode |]
+                else
+                    MidpointRounding.AwayFromZero
+            if decimals >= 0 then
+                JyroNumber(Math.Round(value, decimals, midpoint)) :> JyroValue
+            else
+                let factor = Math.Pow(10.0, float -decimals)
+                JyroNumber(Math.Round(value / factor, 0, midpoint) * factor) :> JyroValue
+
     type MinFunction() =
         inherit JyroFunctionBase("Min", FunctionSignatures.unary "Min" ArrayParam NumberParam)
         override this.ExecuteImpl(args, _) =
@@ -188,6 +216,7 @@ module MathFunctions =
         [ AbsoluteFunction()
           FloorFunction()
           CeilingFunction()
+          RoundFunction()
           MinFunction()
           MaxFunction()
           PowerFunction()
