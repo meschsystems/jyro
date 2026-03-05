@@ -25,7 +25,7 @@ module Lexer =
         "and"; "or"; "not"; "is"; "true"; "false"; "null";
         "number"; "string"; "boolean"; "object"; "array";
         "to"; "downto"; "by"; "func"; "exit";
-        "union"; "match"
+        "union"; "match"; "delete"
     ]
 
     /// Check if a string is a keyword

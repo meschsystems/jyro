@@ -330,6 +330,13 @@ module Validator =
                 ctx.AddError(MessageCode.LoopStatementOutsideOfLoop, "Continue statement outside of loop", [| box "Continue" |], loc)
             else
                 ctx
+        | Delete(target, pos) ->
+            let ctx' = validateExpr ctx target
+            if not (Ast.isDeleteTarget target) then
+                let loc = SourceLocation.Create(pos.Line, pos.Column)
+                ctx'.AddError(MessageCode.InvalidDeleteTarget, "Invalid delete target", Array.empty, loc)
+            else
+                ctx'
         | ExprStmt(expr, _) ->
             validateExpr ctx expr
         | UnionDef(name, _, pos) ->

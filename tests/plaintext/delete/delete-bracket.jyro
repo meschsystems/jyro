@@ -1,0 +1,4 @@
+# Test delete with bracket access (computed key)
+
+var key = "secret"
+delete Data[key]

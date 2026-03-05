@@ -166,6 +166,7 @@ module Linker =
         | Match(expr, cases, _) ->
             let ctx' = linkExpr ctx expr
             cases |> List.fold (fun c mc -> mc.Body |> List.fold linkStmt c) ctx'
+        | Delete(target, _) -> linkExpr ctx target
         | Break _ | Continue _ -> ctx
         | ExprStmt(expr, _) ->
             linkExpr ctx expr

@@ -1,0 +1,4 @@
+# Test delete removes a property from an object
+
+Data.kept = true
+delete Data.removed

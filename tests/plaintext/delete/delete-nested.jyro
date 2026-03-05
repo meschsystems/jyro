@@ -1,0 +1,3 @@
+# Test delete on nested object property
+
+delete Data.user.password

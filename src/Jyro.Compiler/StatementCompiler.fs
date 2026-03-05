@@ -424,6 +424,21 @@ module StatementCompiler =
         else
             Expression.Block(variables, expressions) :> Expression
 
+    /// Compile a delete statement (remove a property from an object)
+    and private compileDelete (ctx: CompilationContext) (target: Expr) : Expression =
+        let removeMethod = typeof<JyroValue>.GetMethod("RemoveProperty")
+        match target with
+        | PropertyAccess(obj, prop, _) ->
+            let objExpr = compileExpr ctx obj
+            let propConst = Expression.Constant(prop, typeof<string>) :> Expression
+            Expression.Call(objExpr, removeMethod, propConst) :> Expression
+        | IndexAccess(obj, index, _) ->
+            let objExpr = compileExpr ctx obj
+            let indexExpr = compileExpr ctx index
+            let keyExpr = Expression.Call(indexExpr, typeof<JyroValue>.GetMethod("ToStringValue")) :> Expression
+            Expression.Call(objExpr, removeMethod, keyExpr) :> Expression
+        | _ -> failwith "Invalid delete target"
+
     /// Compile a single statement with resource checks and location tracking
     and compileStmt (ctx: CompilationContext) (stmt: Stmt) : Expression * CompilationContext =
         let pos = stmt.Position
@@ -531,6 +546,8 @@ module StatementCompiler =
                 match ctx.ContinueLabel with
                 | Some label -> (Expression.Continue(label) :> Expression, ctx)
                 | None -> failwith "Continue outside of loop"
+            | Delete(target, _) ->
+                (withStatementCheck ctx (compileDelete ctx target), ctx)
             | ExprStmt(expr, _) ->
                 (withStatementCheck ctx (compileExpr ctx expr), ctx)
         (withLocationTracking compiled pos, ctx')

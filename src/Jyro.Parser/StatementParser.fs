@@ -201,6 +201,11 @@ module StatementParser =
         withPos (keyword "continue")
         |>> fun (_, pos) -> Continue(pos)
 
+    // Delete statement (removes a property from an object)
+    let private pDelete =
+        withPos (keywordRaw "delete" >>. hws >>. parseExpr)
+        |>> fun (target, pos) -> Delete(target, pos)
+
     // Expression statement (expression evaluated for side effects)
     let private pExprStmt =
         withPos parseExpr
@@ -223,6 +228,7 @@ module StatementParser =
             attempt pFail
             attempt pBreak
             attempt pContinue
+            attempt pDelete
             attempt pAssignment
             attempt pExprStmt
         ]

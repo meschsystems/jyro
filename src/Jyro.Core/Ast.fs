@@ -137,6 +137,8 @@ type Stmt =
     | UnionDef of name: string * variants: UnionVariant list * pos: Position
     /// Match statement for union pattern matching
     | Match of expr: Expr * cases: MatchCase list * pos: Position
+    /// Delete statement (removes a property from an object)
+    | Delete of target: Expr * pos: Position
 
     /// Get the position of this statement
     member this.Position =
@@ -157,6 +159,7 @@ type Stmt =
         | ExprStmt(_, pos) -> pos
         | UnionDef(_, _, pos) -> pos
         | Match(_, _, pos) -> pos
+        | Delete(_, pos) -> pos
 
 /// A case in a switch statement
 and SwitchCase =
@@ -179,6 +182,12 @@ module Ast =
     /// Check if an expression is a valid assignment target
     let rec isAssignmentTarget = function
         | Identifier _ -> true
+        | PropertyAccess _ -> true
+        | IndexAccess _ -> true
+        | _ -> false
+
+    /// Check if an expression is a valid delete target (property or index access only)
+    let isDeleteTarget = function
         | PropertyAccess _ -> true
         | IndexAccess _ -> true
         | _ -> false

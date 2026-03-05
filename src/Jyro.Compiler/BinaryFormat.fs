@@ -313,6 +313,10 @@ module BinaryFormat =
             writeExpr w expr
             writeList w writeMatchCase cases
             writePosition w pos
+        | Delete(target, pos) ->
+            w.Write(0x30uy)
+            writeExpr w target
+            writePosition w pos
 
     // --- Reader helpers ---
 
@@ -620,6 +624,10 @@ module BinaryFormat =
                 let cases = readList r readMatchCase
                 let pos = readPosition r
                 Match(expr, cases, pos)
+            | 0x30uy ->
+                let target = readExpr r
+                let pos = readPosition r
+                Delete(target, pos)
             | tag -> failwithf "Unknown Stmt tag: 0x%02X" tag
         finally
             deserializeDepth <- deserializeDepth - 1

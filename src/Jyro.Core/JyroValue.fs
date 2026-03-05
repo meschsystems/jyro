@@ -34,6 +34,10 @@ type JyroValue() =
     default this.SetProperty(key, _) =
         JyroError.raiseRuntime MessageCode.SetPropertyOnNonObject [| box key; box this.ValueType |]
 
+    abstract member RemoveProperty: key: string -> bool
+    default this.RemoveProperty(key) =
+        JyroError.raiseRuntime MessageCode.SetPropertyOnNonObject [| box key; box this.ValueType |]
+
     abstract member GetIndex: index: JyroValue -> JyroValue
     default _.GetIndex(_) = JyroNull.Instance
 
@@ -542,6 +546,7 @@ and [<Sealed>] JyroObject() =
         | _ -> value <- JyroNull.Instance; false
 
     member _.Remove(key: string) = properties.Remove(key)
+    override _.RemoveProperty(key: string) = properties.Remove(key)
     member _.Clear() = properties.Clear()
 
     member _.ToDictionary() =

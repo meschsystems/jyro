@@ -37,8 +37,9 @@ type MessageCode =
     | UndeclaredVariable = 3100
     | VariableAlreadyDeclared = 3101
     | ReservedIdentifier = 3102
-    // 32xx - Assignment
+    // 32xx - Assignment / Delete
     | InvalidAssignmentTarget = 3200
+    | InvalidDeleteTarget = 3201
     // 33xx - Type
     | TypeMismatch = 3300
     // 34xx - Control flow
@@ -253,6 +254,7 @@ module MessageTemplates =
         templates.[MessageCode.VariableAlreadyDeclared] <- "Variable '{0}' is already declared"
         templates.[MessageCode.ReservedIdentifier] <- "'{0}' is a reserved identifier"
         templates.[MessageCode.InvalidAssignmentTarget] <- "Invalid assignment target"
+        templates.[MessageCode.InvalidDeleteTarget] <- "Invalid delete target — delete requires a property access (e.g. delete obj.key)"
         templates.[MessageCode.TypeMismatch] <- "{0}"
         templates.[MessageCode.LoopStatementOutsideOfLoop] <- "{0} statement outside of loop"
         templates.[MessageCode.ExcessiveLoopNesting] <- "Loop nesting exceeds maximum depth of {0}"
